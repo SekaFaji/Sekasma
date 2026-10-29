@@ -2,13 +2,12 @@
 import React, { useEffect, useRef, useState } from "react";
 
 // ============================================================
-// IDLE PLASMA BALL — v10 "SPLIT & BULK"
-// - One string per finger; SPLIT upgrade forks it into branches
-//   (each branch 0.75x → 1 split = 1.5x output, 2 = 2.25x...)
-// - Bulk buy: 1 / 5 / 10 / 100 / MAX buttons
-// - Finger-family foot (3 toes) + slimmer, longer human finger
-// - High-level fingers/toes cost MULTIPLE gas currencies
-// - Micro-volts, wandering arcs, helpers on both glass sides
+// IDLE PLASMA BALL — v10.1 "FEEL & FEEDBACK"
+// - v10: one string per finger; SPLIT forks it (each branch 0.75x),
+//   bulk buy ×1/×5/×10/×100/MAX, multi-gas costs, micro-volts
+// - v10.1: purchase toasts + haptic buzz (toggle), afford dots on
+//   sub-tabs, sticky BUY bar, unlock progress bars, options saved
+//   between sessions, press feedback on every button
 // Logic block is framework-free → Vite + Capacitor.
 // ============================================================
 
@@ -186,10 +185,42 @@ function fmtShort(n: number): string {
   return (n / 1e9).toFixed(1) + "B";
 }
 
+function haptic(ms: number) {
+  try {
+    const nav = navigator as Navigator & { vibrate?: (p: number | number[]) => boolean };
+    nav.vibrate?.(ms);
+  } catch {
+    /* device without vibration */
+  }
+}
+
+function buyMsg(kind: BuyKind, gid: GasId | undefined, n: number): string {
+  const s = (base: string) => (n > 1 ? base + "S" : base);
+  if (kind === "finger") return `+${n} ${s("FINGER")} HIRED`;
+  if (kind === "toe") return n > 1 ? `+${n} FEET HIRED` : "+1 FOOT HIRED";
+  if (kind === "filament") return `+${n} ${gasById(gid!).name} ${s("ARC")}`;
+  if (kind === "voltage") return `+${n} ${s("VOLT STEP")}`;
+  return `+${n} ${s("BRANCH")}`;
+}
+
 const SAVE_KEY = "idle-plasma-ball-save-v10";
 const LEGACY_V9_KEY = "idle-plasma-ball-save-v9";
 const LEGACY_V8_KEY = "idle-plasma-ball-save-v8";
 const LEGACY_V6_KEY = "idle-plasma-ball-save-v6";
+const OPTS_KEY = "idle-plasma-ball-opts-v1";
+
+function loadOpts(): { scan: boolean; buzz: boolean } {
+  try {
+    const raw = window.localStorage.getItem(OPTS_KEY);
+    if (raw) {
+      const o = JSON.parse(raw) as { scan?: boolean; buzz?: boolean };
+      return { scan: o.scan !== false, buzz: o.buzz !== false };
+    }
+  } catch {
+    /* defaults */
+  }
+  return { scan: true, buzz: true };
+}
 
 function freshSave(): GameState {
   const now = Date.now();
@@ -631,7 +662,7 @@ type Wanderer = {
 };
 
 function PlasmaBall({
-  filaments, splits, unlocked, fingers, toes, crackles, neonPow, onCrackle,
+  filaments, splits, unlocked, fingers, toes, crackles, neonPow, onCrackle, buzzOn,
 }: {
   filaments: GasRecord;
   splits: GasRecord;
@@ -641,6 +672,7 @@ function PlasmaBall({
   crackles: number;
   neonPow: number;
   onCrackle: (fingerCount: number) => void;
+  buzzOn: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -654,6 +686,8 @@ function PlasmaBall({
   propsRef.current = { filaments, splits, unlocked, fingers, toes, crackles };
   const neonPowRef = useRef(neonPow);
   neonPowRef.current = neonPow;
+  const buzzRef = useRef(buzzOn);
+  buzzRef.current = buzzOn;
   const crackleRef = useRef(onCrackle);
   crackleRef.current = onCrackle;
 
@@ -1033,6 +1067,7 @@ function PlasmaBall({
         const p = toLocal(e);
         pointers.current.set(e.pointerId, p);
         if (Math.hypot(p.x - CX, p.y - CY) < R * 1.15) {
+          if (buzzRef.current) haptic(8);
           crackleRef.current(1);
           texts.current.push({ x: p.x, y: p.y - 8, age: 0, str: `+${fmtShort(neonPowRef.current)}` });
           ripples.current.push({ x: p.x, y: p.y, age: 0, color: "#ffffff" });
@@ -1058,7 +1093,10 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("upgrades");
   const [upTab, setUpTab] = useState<UpTab>("help");
   const [qty, setQty] = useState<number | "max">(1);
-  const [scanlines, setScanlines] = useState(true);
+  const [scanlines, setScanlines] = useState(() => loadOpts().scan);
+  const [buzz, setBuzz] = useState(() => loadOpts().buzz);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastT = useRef<number | undefined>(undefined);
   const [confirmReset, setConfirmReset] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1119,6 +1157,15 @@ export default function App() {
     };
   }, []);
 
+  // options persist between sessions
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(OPTS_KEY, JSON.stringify({ scan: scanlines, buzz }));
+    } catch {
+      /* in-session only */
+    }
+  }, [scanlines, buzz]);
+
   const unlockedGases = state.unlocked.map(gasById);
   const rates = idleRate(state);
   const neonGas = gasById("neon");
@@ -1138,9 +1185,19 @@ export default function App() {
       return { ...s, plasma, total, crackles: s.crackles + fingerCount };
     });
 
-  const buy = (kind: BuyKind, gid?: GasId) =>
+  const showToast = (msg: string) => {
+    setToast(msg);
+    window.clearTimeout(toastT.current);
+    toastT.current = window.setTimeout(() => setToast(null), 1500);
+  };
+  const buzzNow = (ms: number) => {
+    if (buzz) haptic(ms);
+  };
+
+  const buy = (kind: BuyKind, gid?: GasId) => {
+    const want = kind === "gas" ? 1 : qty === "max" ? 1000 : qty;
+    const pre = bulkCost(stateRef.current, kind, gid, want);
     setState((s) => {
-      const want = kind === "gas" ? 1 : qty === "max" ? 1000 : qty;
       const { cost, count } = bulkCost(s, kind, gid, want);
       if (count <= 0) return s;
       const next: GameState = { ...s, plasma: { ...s.plasma } };
@@ -1160,12 +1217,48 @@ export default function App() {
       }
       return next;
     });
+    if (pre.count > 0) {
+      buzzNow(12);
+      showToast(
+        kind === "gas"
+          ? `${nextGas(stateRef.current.unlocked)?.name ?? "GAS"} UNLOCKED`
+          : buyMsg(kind, gid, pre.count),
+      );
+    }
+  };
 
   const bulkWant = qty === "max" ? 1000 : qty;
   const fingerBuy = bulkCost(state, "finger", undefined, bulkWant);
   const toeBuy = bulkCost(state, "toe", undefined, bulkWant);
   const argonUnlocked = state.unlocked.includes("argon");
   const nxGas = nextGas(state.unlocked);
+
+  // afford dots for sub-tabs (shown only on tabs you're NOT looking at)
+  const powerKinds: BuyKind[] = ["filament", "voltage", "split"];
+  const subDots: Record<UpTab, boolean> = {
+    help: fingerBuy.count > 0 || (argonUnlocked && toeBuy.count > 0),
+    gas: !!nxGas && canAfford(state, nxGas.unlockCost),
+    power: unlockedGases.some((g) => powerKinds.some((k) => bulkCost(state, k, g.id, 1).count > 0)),
+  };
+
+  // how close you are to affording a locked upgrade, 0..1
+  const unlockPct = (cost: Partial<GasRecord>) => {
+    let pct = 1;
+    for (const [g, amt] of Object.entries(cost) as [GasId, number][])
+      pct = Math.min(pct, state.plasma[g] / amt);
+    return Math.max(0, Math.min(1, pct));
+  };
+  const UnlockBar = ({ cost, color }: { cost: Partial<GasRecord>; color: string }) => {
+    const pct = Math.round(unlockPct(cost) * 100);
+    return (
+      <div className="mb-1 flex items-center gap-1 px-2 pt-0.5">
+        <div className="h-1.5 flex-1 border border-white/15 bg-[#0b0618]">
+          <div className="h-full" style={{ width: `${pct}%`, background: color }} />
+        </div>
+        <span className="shrink-0 text-[8px] tabular-nums text-white/40">{pct}%</span>
+      </div>
+    );
+  };
 
   const CostChips = ({ cost, ok }: { cost: Partial<GasRecord>; ok: boolean }) => (
     <div className="flex shrink-0 flex-col items-end gap-0.5">
@@ -1268,7 +1361,7 @@ export default function App() {
 
         {offlineGain !== null && (
           <button
-            className="border-b-2 border-white/15 bg-[#1b1233] px-3 py-2 text-[10px]"
+            className="border-b-2 border-white/15 bg-[#1b1233] px-3 py-2 text-[10px] active:bg-[#241840]"
             onClick={() => setOfflineGain(null)}
           >
             THE HELP KEPT PRESSING WHILE YOU WERE AWAY:{" "}
@@ -1289,6 +1382,7 @@ export default function App() {
             toes={state.toes}
             crackles={state.crackles}
             neonPow={neonPow}
+            buzzOn={buzz}
             onCrackle={crackle}
           />
         </div>
@@ -1303,7 +1397,7 @@ export default function App() {
             <button
               key={id}
               onClick={() => setTab(id)}
-              className={`py-2 text-[10px] tracking-widest ${
+              className={`py-2 text-[10px] tracking-widest active:translate-y-[1px] ${
                 tab === id ? "bg-[#1b1233] text-white" : "text-white/40"
               }`}
               style={tab === id ? { borderBottom: `3px solid ${accent}` } : { borderBottom: "3px solid transparent" }}
@@ -1314,46 +1408,59 @@ export default function App() {
         </nav>
 
         {/* panel — fixed height so switching tabs never moves the layout */}
-        <div className="h-[42vh] shrink-0 overflow-y-auto bg-[#0d0820] p-2">
+        <div className="relative h-[42vh] shrink-0 overflow-y-auto bg-[#0d0820] p-2">
+          {toast && (
+            <div
+              className="pointer-events-none absolute inset-x-2 bottom-2 z-20 border-2 px-2 py-1.5 text-center text-[9px] tracking-widest"
+              style={{ borderColor: accent, color: accent, background: "#1b1233" }}
+            >
+              {toast}
+            </div>
+          )}
           {tab === "upgrades" && (
             <div className="flex flex-col gap-1.5">
-              {/* sub-tab bar */}
-              <div className="mb-1 grid grid-cols-3 border-2 border-white/15">
-                {([
-                  ["help", "HELP"],
-                  ["gas", "GAS"],
-                  ["power", "POWER"],
-                ] as [UpTab, string][]).map(([id, label]) => (
-                  <button
-                    key={id}
-                    onClick={() => setUpTab(id)}
-                    className={`py-1 text-[9px] tracking-widest ${
-                      upTab === id ? "bg-[#1b1233] text-white" : "text-white/40"
-                    }`}
-                    style={upTab === id ? { borderBottom: `2px solid ${accent}` } : { borderBottom: "2px solid transparent" }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {/* buy quantity selector */}
-              {upTab !== "gas" && (
-                <div className="mb-1 flex items-center gap-1">
-                  <span className="shrink-0 text-[8px] tracking-widest text-white/40">BUY</span>
-                  {([1, 5, 10, 100, "max"] as (number | "max")[]).map((q) => (
+              {/* sticky sub-tab + BUY bar */}
+              <div className="sticky top-0 z-10 -mx-2 mb-1 bg-[#0d0820] px-2 pt-0.5">
+                <div className="grid grid-cols-3 border-2 border-white/15">
+                  {([
+                    ["help", "HELP"],
+                    ["gas", "GAS"],
+                    ["power", "POWER"],
+                  ] as [UpTab, string][]).map(([id, label]) => (
                     <button
-                      key={String(q)}
-                      onClick={() => setQty(q)}
-                      className={`flex-1 border py-1 text-[9px] tabular-nums ${
-                        qty === q ? "border-white/60 bg-[#1b1233] text-white" : "border-white/15 text-white/40"
+                      key={id}
+                      onClick={() => setUpTab(id)}
+                      className={`py-1 text-[9px] tracking-widest active:translate-y-[1px] ${
+                        upTab === id ? "bg-[#1b1233] text-white" : "text-white/40"
                       }`}
+                      style={upTab === id ? { borderBottom: `2px solid ${accent}` } : { borderBottom: "2px solid transparent" }}
                     >
-                      {q === "max" ? "MAX" : `×${q}`}
+                      {label}
+                      {upTab !== id && subDots[id] && (
+                        <span className="ml-1 inline-block h-1 w-1 align-middle" style={{ background: accent }} />
+                      )}
                     </button>
                   ))}
                 </div>
-              )}
+
+                {/* buy quantity selector */}
+                {upTab !== "gas" && (
+                  <div className="mt-1 flex items-center gap-1">
+                    <span className="shrink-0 text-[8px] tracking-widest text-white/40">BUY</span>
+                    {([1, 5, 10, 100, "max"] as (number | "max")[]).map((q) => (
+                      <button
+                        key={String(q)}
+                        onClick={() => setQty(q)}
+                        className={`flex-1 border py-1 text-[9px] tabular-nums active:translate-y-[1px] ${
+                          qty === q ? "border-white/60 bg-[#1b1233] text-white" : "border-white/15 text-white/40"
+                        }`}
+                      >
+                        {q === "max" ? "MAX" : `×${q}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {upTab === "help" && (
                 <>
@@ -1374,12 +1481,17 @@ export default function App() {
                         <PixelIcon sprite={FOOT_SPRITE} palette={SKIN_PALETTE} px={3} />,
                         () => buy("toe"), toeBuy.count === 0, SKIN,
                       )
-                    : upRow(
-                        "BIG TOE", "UNLOCKS WITH ARGON GAS",
-                        { argon: 15 },
-                        <PixelIcon sprite={FOOT_SPRITE} palette={SKIN_PALETTE} px={3} />,
-                        () => {}, true,
-                      )}
+                    : (
+                      <React.Fragment>
+                        {upRow(
+                          "BIG TOE", "UNLOCKS WITH ARGON GAS",
+                          { argon: 15 },
+                          <PixelIcon sprite={FOOT_SPRITE} palette={SKIN_PALETTE} px={3} />,
+                          () => {}, true,
+                        )}
+                        <UnlockBar cost={{ argon: 15 }} color={gasById("argon").color} />
+                      </React.Fragment>
+                    )}
                 </>
               )}
 
@@ -1393,13 +1505,18 @@ export default function App() {
                     ),
                   )}
                   {nxGas
-                    ? upRow(
-                        `${nxGas.name} GAS`, `FILL THE BALL · NEW CURRENCY · ${fmt(nxGas.baseRate)}/TAP BASE`,
-                        nxGas.unlockCost,
-                        <PixelIcon sprite={GAS_ICON} color={nxGas.color} px={3} />,
-                        () => buy("gas"), !canAfford(state, nxGas.unlockCost),
-                        nxGas.color,
-                      )
+                    ? (
+                      <React.Fragment>
+                        {upRow(
+                          `${nxGas.name} GAS`, `FILL THE BALL · NEW CURRENCY · ${fmt(nxGas.baseRate)}/TAP BASE`,
+                          nxGas.unlockCost,
+                          <PixelIcon sprite={GAS_ICON} color={nxGas.color} px={3} />,
+                          () => buy("gas"), !canAfford(state, nxGas.unlockCost),
+                          nxGas.color,
+                        )}
+                        <UnlockBar cost={nxGas.unlockCost} color={nxGas.color} />
+                      </React.Fragment>
+                    )
                     : infoRow(
                         "MORE GAS", "A FUTURE BUILD MIGHT HOLD HEAVIER GASES",
                         <PixelIcon sprite={GAS_ICON} color="#ffffff40" px={3} />,
@@ -1424,7 +1541,8 @@ export default function App() {
                         </div>
                         {upRow(
                           `${g.name} ARC`,
-                          `+1 STRING · ${fmt(cracklePower(g, state))} → ${fmt(nextPow)}/TAP · ${fil}/${g.cap}`,
+                          `+1 STRING · ${fmt(cracklePower(g, state))} → ${fmt(nextPow)}/TAP · ${fil}/${g.cap}` +
+                            (filBuy.count > 1 ? ` · +${filBuy.count}` : ""),
                           filBuy.cost,
                           <PixelIcon sprite={FIL_ICON} color={g.color} px={3} />,
                           () => buy("filament", g.id),
@@ -1433,7 +1551,8 @@ export default function App() {
                         )}
                         {upRow(
                           `${g.name} VOLTS`,
-                          `+0.0001V · NOW ${fmtVolts(steps)} · X${voltMult(steps).toFixed(4)} OUTPUT`,
+                          `+0.0001V · NOW ${fmtVolts(steps)} · X${voltMult(steps).toFixed(4)} OUTPUT` +
+                            (voltBuy.count > 1 ? ` · +${voltBuy.count} STEPS` : ""),
                           voltBuy.cost,
                           <PixelIcon sprite={VOLT_ICON} color={g.color} px={3} />,
                           () => buy("voltage", g.id),
@@ -1442,7 +1561,8 @@ export default function App() {
                         )}
                         {upRow(
                           `${g.name} SPLIT`,
-                          `+1 BRANCH · EACH 0.75X · NOW X${splitMult(spl).toFixed(2)} · ${spl}/${SPLIT_CAP}`,
+                          `+1 BRANCH · EACH 0.75X · NOW X${splitMult(spl).toFixed(2)} · ${spl}/${SPLIT_CAP}` +
+                            (splitBuy.count > 1 ? ` · +${splitBuy.count}` : ""),
                           splitBuy.cost,
                           <PixelIcon sprite={SPLIT_ICON} color={g.color} px={3} />,
                           () => buy("split", g.id),
@@ -1498,11 +1618,20 @@ export default function App() {
             <div className="flex flex-col gap-2 text-[11px]">
               <button
                 onClick={() => setScanlines((v) => !v)}
-                className="flex items-center justify-between border-2 border-white/25 bg-[#1b1233] p-2"
+                className="flex items-center justify-between border-2 border-white/25 bg-[#1b1233] p-2 active:translate-y-[1px]"
               >
                 <span>CRT SCANLINES</span>
                 <span style={{ color: scanlines ? "#61e06b" : "#ffffff40" }}>
                   {scanlines ? "ON" : "OFF"}
+                </span>
+              </button>
+              <button
+                onClick={() => setBuzz((v) => !v)}
+                className="flex items-center justify-between border-2 border-white/25 bg-[#1b1233] p-2 active:translate-y-[1px]"
+              >
+                <span>HAPTIC BUZZ</span>
+                <span style={{ color: buzz ? "#61e06b" : "#ffffff40" }}>
+                  {buzz ? "ON" : "OFF"}
                 </span>
               </button>
               <button
@@ -1512,7 +1641,7 @@ export default function App() {
                     setConfirmReset(false);
                   } else setConfirmReset(true);
                 }}
-                className="border-2 p-2"
+                className="border-2 p-2 active:translate-y-[1px]"
                 style={{
                   borderColor: confirmReset ? "#ff5ec8" : "#ffffff40",
                   color: confirmReset ? "#ff5ec8" : "#ffffff80",
@@ -1522,10 +1651,11 @@ export default function App() {
                 {confirmReset ? "TAP AGAIN TO CONFIRM RESET" : "RESET SAVE"}
               </button>
               <p className="px-1 text-[9px] leading-relaxed text-white/30">
-                V10 · SPLIT &amp; BULK — ONE STRING PER FINGER THAT FORKS WITH
-                SPLIT UPGRADES (EACH BRANCH 0.75X), BULK BUY ×1/×5/×10/×100/MAX,
-                AND HIGH-LEVEL FINGERS &amp; FEET THAT COST MULTIPLE GAS
-                CURRENCIES AT ONCE.
+                V10.1 · FEEL &amp; FEEDBACK — TOASTS AND BUZZ ON EVERY BUY,
+                AFFORDABLE DOTS ON THE SUB-TABS, A STICKY BUY BAR, UNLOCK
+                PROGRESS BARS, AND OPTIONS THAT STAY SAVED. STILL ONE STRING
+                PER FINGER (EACH SPLIT BRANCH 0.75X) WITH BULK BUY
+                ×1/×5/×10/×100/MAX.
               </p>
             </div>
           )}
