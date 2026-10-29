@@ -2,12 +2,12 @@
 import React, { useEffect, useRef, useState } from "react";
 
 // ============================================================
-// IDLE PLASMA BALL — v10.1 "FEEL & FEEDBACK"
-// - v10: one string per finger; SPLIT forks it (each branch 0.75x),
-//   bulk buy ×1/×5/×10/×100/MAX, multi-gas costs, micro-volts
-// - v10.1: purchase toasts + haptic buzz (toggle), afford dots on
-//   sub-tabs, sticky BUY bar, unlock progress bars, options saved
-//   between sessions, press feedback on every button
+// IDLE PLASMA BALL — v11 "THE PLASMA PRESSES BACK"
+// - v10: SPLIT-forked strings, bulk buy, multi-gas costs, micro-volts
+// - v10.1: toasts, haptics, afford dots, sticky BUY bar, unlock bars
+// - v11: GHOST HANDS — the plasma presses back from inside the
+//   glass (20x a finger, manifest → hold → dissolve), and living
+//   static motes drifting inside the ball even when idle
 // Logic block is framework-free → Vite + Capacitor.
 // ============================================================
 
@@ -40,6 +40,7 @@ type GameState = {
   voltage: GasRecord; // volt STEPS per gas (each = +0.0001V output)
   fingers: number;
   toes: number;
+  ghosts: number;
   filaments: GasRecord; // arcs are per-gas
   splits: GasRecord; // string split branches per gas
   unlocked: GasId[];
@@ -57,6 +58,7 @@ const FIL_BASE: GasRecord = { neon: 12, argon: 30, xenon: 80 };
 const VOLT_BASE: GasRecord = { neon: 6, argon: 16, xenon: 48 };
 const SPLIT_BASE: GasRecord = { neon: 20, argon: 60, xenon: 150 };
 const SPLIT_CAP = 8; // max branches per gas
+const GHOST_MULT = 20; // a ghost hand presses 20x harder than a finger
 
 // a split string: every branch carries 0.75x → 1 split = 1.5x output
 const splitMult = (n: number) => (n <= 0 ? 1 : 0.75 * (1 + n));
@@ -94,6 +96,9 @@ const toeCost = (n: number, unlocked: GasId[]): Partial<GasRecord> => {
     c.xenon = Math.ceil(4 * Math.pow(1.12, n));
   return c;
 };
+const ghostCost = (n: number): Partial<GasRecord> => ({
+  xenon: Math.ceil(80 * Math.pow(1.45, n)),
+});
 const splitCost = (g: GasId, n: number): Partial<GasRecord> => ({
   [g]: Math.ceil(SPLIT_BASE[g] * Math.pow(2.2, n)),
 } as Partial<GasRecord>);
@@ -113,7 +118,9 @@ const idleRate = (s: GameState): GasRecord => {
   const out = zero3();
   for (const g of GAS_LIST) {
     if (!s.unlocked.includes(g.id)) continue;
-    out[g.id] = ((s.fingers + s.toes * TOE_MULT) * cracklePower(g, s)) / PRESS_INTERVAL;
+    out[g.id] =
+      ((s.fingers + s.toes * TOE_MULT + s.ghosts * GHOST_MULT) * cracklePower(g, s)) /
+      PRESS_INTERVAL;
   }
   return out;
 };
@@ -126,7 +133,7 @@ const pay = (s: GameState, cost: Partial<GasRecord>) => {
 };
 
 // ---------- Bulk buying (1 / 5 / 10 / 100 / MAX) ----------
-type BuyKind = "finger" | "toe" | "filament" | "voltage" | "split" | "gas";
+type BuyKind = "finger" | "toe" | "ghost" | "filament" | "voltage" | "split" | "gas";
 
 const addCosts = (a: Partial<GasRecord>, b: Partial<GasRecord>): Partial<GasRecord> => {
   const out: Partial<GasRecord> = { ...a };
@@ -146,6 +153,7 @@ const bulkCost = (
     let c: Partial<GasRecord> | null = null;
     if (kind === "finger") c = fingerCost(s.fingers + n, s.unlocked);
     if (kind === "toe") c = toeCost(s.toes + n, s.unlocked);
+    if (kind === "ghost") c = ghostCost(s.ghosts + n);
     if (kind === "filament" && gid)
       c = s.filaments[gid] + n >= gasById(gid).cap ? null : filamentCost(gid, s.filaments[gid] + n);
     if (kind === "voltage" && gid)
@@ -198,6 +206,7 @@ function buyMsg(kind: BuyKind, gid: GasId | undefined, n: number): string {
   const s = (base: string) => (n > 1 ? base + "S" : base);
   if (kind === "finger") return `+${n} ${s("FINGER")} HIRED`;
   if (kind === "toe") return n > 1 ? `+${n} FEET HIRED` : "+1 FOOT HIRED";
+  if (kind === "ghost") return n > 1 ? `+${n} GHOST HANDS` : "+1 GHOST HAND";
   if (kind === "filament") return `+${n} ${gasById(gid!).name} ${s("ARC")}`;
   if (kind === "voltage") return `+${n} ${s("VOLT STEP")}`;
   return `+${n} ${s("BRANCH")}`;
@@ -226,7 +235,7 @@ function freshSave(): GameState {
   const now = Date.now();
   return {
     plasma: zero3(), total: zero3(), crackles: 0,
-    voltage: zero3(), fingers: 0, toes: 0,
+    voltage: zero3(), fingers: 0, toes: 0, ghosts: 0,
     filaments: zero3(), splits: zero3(), unlocked: ["neon"],
     created: now, lastSeen: now,
   };
@@ -236,9 +245,10 @@ function freshSave(): GameState {
 function migrateSave(old: Record<string, unknown>): GameState {
   const base = freshSave();
   // v10 / v9 saves: load as-is (v9 predates splits)
-  if (old.v === 10 || old.v === 9) {
+  if (old.v === 11 || old.v === 10 || old.v === 9) {
     const s = { ...base, ...(old as unknown as GameState) };
     if (!s.splits) s.splits = zero3();
+    if (typeof s.ghosts !== "number") s.ghosts = 0;
     return s;
   }
   // v6 save: single currency, volts were x2 levels
@@ -300,7 +310,7 @@ function loadSave(): GameState | null {
 }
 function persist(s: GameState) {
   try {
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 10 }));
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 11 }));
   } catch {
     /* in-session only */
   }
@@ -366,6 +376,21 @@ const PLAYER_FINGER = [
   "...0000..",
 ];
 
+// the ghost hand: reaches from the electrode, fingers toward the glass
+const GHOST_SPRITE = [
+  "2.2.2.2",
+  "2.2.2.2",
+  "1212121",
+  "1111111",
+  ".11111.",
+  ".11111.",
+  ".11111.",
+  "..111..",
+  "..111..",
+  "...1...",
+];
+const GHOST_PALETTE: Record<string, string> = { "1": "#a9b8ff", "2": "#eef4ff" };
+
 function rotCW(s: string[]): string[] {
   const H = s.length;
   const W = s[0].length;
@@ -388,6 +413,12 @@ const FOOT_ORIENTS = [
   rotCW(FOOT_SPRITE),
   rotCW(rotCW(FOOT_SPRITE)),
   rotCW(rotCW(rotCW(FOOT_SPRITE))),
+];
+const GHOST_ORIENTS = [
+  GHOST_SPRITE,
+  rotCW(GHOST_SPRITE),
+  rotCW(rotCW(GHOST_SPRITE)),
+  rotCW(rotCW(rotCW(GHOST_SPRITE))),
 ];
 
 function drawSprite(
@@ -426,6 +457,29 @@ function drawOriented(
     Math.round(CY + Math.sin(angle) * rad - h / 2),
     palette,
   );
+}
+
+// ghost hands: grow from the electrode, fingers point OUT to the glass
+function drawGhost(
+  ctx: CanvasRenderingContext2D,
+  angle: number,
+  reach: number,
+  alpha: number,
+  t: number,
+) {
+  const idx = ((Math.round((angle + Math.PI / 2) / (Math.PI / 2)) % 4) + 4) % 4;
+  const spr = GHOST_ORIENTS[idx];
+  const w = spr[0].length;
+  const h = spr.length;
+  const jitter = Math.sin(t * 21) * 0.6;
+  ctx.globalAlpha = alpha;
+  drawSprite(
+    ctx, spr,
+    Math.round(CX + Math.cos(angle) * (reach + jitter) - w / 2),
+    Math.round(CY + Math.sin(angle) * (reach + jitter) - h / 2),
+    GHOST_PALETTE,
+  );
+  ctx.globalAlpha = 1;
 }
 
 // ---------- UI pixel icons (no emoji) ----------
@@ -662,13 +716,14 @@ type Wanderer = {
 };
 
 function PlasmaBall({
-  filaments, splits, unlocked, fingers, toes, crackles, neonPow, onCrackle, buzzOn,
+  filaments, splits, unlocked, fingers, toes, ghosts, crackles, neonPow, onCrackle, buzzOn,
 }: {
   filaments: GasRecord;
   splits: GasRecord;
   unlocked: Gas[];
   fingers: number;
   toes: number;
+  ghosts: number;
   crackles: number;
   neonPow: number;
   onCrackle: (fingerCount: number) => void;
@@ -682,8 +737,8 @@ function PlasmaBall({
   const holdArcs = useRef<HoldArc[]>([]);
   const fingerSeeds = useRef<Wanderer[]>([]);
   const toeSeeds = useRef<Wanderer[]>([]);
-  const propsRef = useRef({ filaments, splits, unlocked, fingers, toes, crackles });
-  propsRef.current = { filaments, splits, unlocked, fingers, toes, crackles };
+  const propsRef = useRef({ filaments, splits, unlocked, fingers, toes, ghosts, crackles });
+  propsRef.current = { filaments, splits, unlocked, fingers, toes, ghosts, crackles };
   const neonPowRef = useRef(neonPow);
   neonPowRef.current = neonPow;
   const buzzRef = useRef(buzzOn);
@@ -783,6 +838,37 @@ function PlasmaBall({
         b.globalAlpha = 1;
       }
       cache.sig = signature;
+    };
+
+    // ---- living static motes: slow violet sparks inside the glass ----
+    const MOTE_COLS = ["#b7b2ff", "#9b8cff", "#8f8bd8", "#cfd8ff"];
+    const motes: {
+      ang: number; rad: number; spd: number; wob: number; ph: number;
+      big: boolean; col: string; tint: boolean;
+    }[] = [];
+    for (let i = 0; i < 26; i++) {
+      motes.push({
+        ang: Math.random() * Math.PI * 2,
+        rad: 5 + Math.random() * (R - 10),
+        spd: (0.08 + Math.random() * 0.3) * (Math.random() < 0.5 ? -1 : 1),
+        wob: Math.random() * Math.PI * 2,
+        ph: Math.random() * Math.PI * 2,
+        big: Math.random() < 0.18,
+        col: MOTE_COLS[Math.floor(Math.random() * MOTE_COLS.length)],
+        tint: Math.random() < 0.2,
+      });
+    }
+
+    // ---- ghost hands: the plasma presses back ----
+    const GHOST_T = 4.5; // manifest cycle: emerge 0.7s → hold 1.3s → dissolve 0.5s
+    const ghostOffs: number[] = [];
+    const ghostState = (i: number, t: number) => {
+      const off = ghostOffs[i] ?? 0;
+      const tc = (t + off) % GHOST_T;
+      if (tc < 0.7) return { st: 0, p: tc / 0.7 };
+      if (tc < 2.0) return { st: 1, p: (tc - 0.7) / 1.3 };
+      if (tc < 2.5) return { st: 2, p: (tc - 2.0) / 0.5 };
+      return { st: 3, p: 0 };
     };
 
     let raf = 0;
@@ -905,6 +991,78 @@ function PlasmaBall({
       // the glass
       ctx.drawImage(held || activeFlash ? cache.lit : cache.dead, 0, 0);
 
+      // ---- living static motes: the ball is never quite dead ----
+      for (const m of motes) {
+        m.ang += m.spd * dt * (held ? 2.2 : 1);
+        const wob = Math.sin(t * 0.8 + m.wob) * 2.5;
+        let x = CX + Math.cos(m.ang) * (m.rad + wob);
+        let y = CY + Math.sin(m.ang) * (m.rad + wob);
+        if (held && pts.length > 0) {
+          const pt = pts[0][1];
+          x += (pt.x - x) * 0.12;
+          y += (pt.y - y) * 0.12;
+        }
+        ctx.globalAlpha = 0.22 + 0.38 * (0.5 + 0.5 * Math.sin(t * 3.1 + m.ph));
+        ctx.fillStyle = m.tint ? pickGas().color : m.col;
+        if (m.big) {
+          ctx.fillRect(Math.round(x), Math.round(y), 2, 2);
+        } else {
+          ctx.fillRect(
+            Math.round(x) + (Math.random() < 0.2 ? (Math.random() < 0.5 ? -1 : 1) : 0),
+            Math.round(y), 1, 1,
+          );
+        }
+      }
+      ctx.globalAlpha = 1;
+
+      // ---- ghost hands press from INSIDE the glass ----
+      let ghostHold: { ang: number } | null = null;
+      const gho = propsRef.current.ghosts;
+      while (ghostOffs.length < gho) ghostOffs.push(Math.random() * GHOST_T);
+      if (ghostOffs.length > gho) ghostOffs.length = gho;
+      for (let gi = 0; gi < gho; gi++) {
+        const { st, p } = ghostState(gi, t);
+        if (st === 3) continue;
+        const ang = gi * 2.399963 + Math.sin(t * 0.11 + gi * 1.7) * 0.15;
+        let reach: number;
+        let alpha: number;
+        if (st === 0) {
+          const e = p * p * (3 - 2 * p);
+          reach = 10 + (R - 17) * e;
+          alpha = 0.15 + 0.6 * e;
+        } else if (st === 1) {
+          reach = R - 7 + Math.sin(t * 13 + gi) * 0.7;
+          alpha = 0.62 + Math.sin(t * 9 + gi) * 0.1;
+          ghostHold = { ang };
+        } else {
+          reach = R - 7 + p * 14;
+          alpha = 0.75 * (1 - p);
+        }
+        drawGhost(ctx, ang, reach, alpha, t + gi);
+        if (st === 1) {
+          // your strings bend toward its palm
+          drawPlasmaArc(
+            ctx, CX, CY,
+            CX + Math.cos(ang) * (R - 8), CY + Math.sin(ang) * (R - 8),
+            pickGas(), t, gi, 2.4, 1.3,
+          );
+          // press moment → flash + ripple on the glass
+          const tc = (t + ghostOffs[gi]) % GHOST_T;
+          if (tc - Math.min(dt, 0.1) < 0.7) {
+            flashes.current.push({
+              x: Math.round(CX + Math.cos(ang) * (R - 2)),
+              y: Math.round(CY + Math.sin(ang) * (R - 2)),
+              age: 0, forks: 2, amp: 5, gas: pickGas(),
+            });
+            ripples.current.push({
+              x: CX + Math.cos(ang) * (R - 1),
+              y: CY + Math.sin(ang) * (R - 1),
+              age: 0, color: "#cfd8ff",
+            });
+          }
+        }
+      }
+
       // ---- press flashes: arcs through the glass in gas colors ----
       flashes.current = flashes.current.filter((f) => f.age < 0.16);
       for (const f of flashes.current) {
@@ -947,8 +1105,13 @@ function PlasmaBall({
             tx = owner.x + Math.cos(a.ang) * a.reach;
             ty = owner.y + Math.sin(a.ang) * a.reach;
           } else {
-            tx = CX + Math.cos(a.ang) * a.reach;
-            ty = CY + Math.sin(a.ang) * a.reach;
+            let ra = a.ang;
+            if (ghostHold) {
+              const pull = ghostHold.ang - a.ang;
+              ra += Math.atan2(Math.sin(pull), Math.cos(pull)) * 0.12;
+            }
+            tx = CX + Math.cos(ra) * a.reach;
+            ty = CY + Math.sin(ra) * a.reach;
           }
           drawPlasmaArc(ctx, CX, CY, tx, ty, a.gas, t, a.phase, a.kind === "leader" ? 2.2 : 3.4, 1.4);
           // SPLIT upgrade: your one string forks, real-plasma-ball style
@@ -1204,6 +1367,7 @@ export default function App() {
       pay(next, cost);
       if (kind === "finger") next.fingers = s.fingers + count;
       if (kind === "toe") next.toes = s.toes + count;
+      if (kind === "ghost") next.ghosts = s.ghosts + count;
       if (kind === "filament" && gid)
         next.filaments = { ...s.filaments, [gid]: s.filaments[gid] + count };
       if (kind === "voltage" && gid)
@@ -1230,13 +1394,17 @@ export default function App() {
   const bulkWant = qty === "max" ? 1000 : qty;
   const fingerBuy = bulkCost(state, "finger", undefined, bulkWant);
   const toeBuy = bulkCost(state, "toe", undefined, bulkWant);
+  const ghostBuy = bulkCost(state, "ghost", undefined, bulkWant);
   const argonUnlocked = state.unlocked.includes("argon");
+  const xenonUnlocked = state.unlocked.includes("xenon");
   const nxGas = nextGas(state.unlocked);
 
   // afford dots for sub-tabs (shown only on tabs you're NOT looking at)
   const powerKinds: BuyKind[] = ["filament", "voltage", "split"];
   const subDots: Record<UpTab, boolean> = {
-    help: fingerBuy.count > 0 || (argonUnlocked && toeBuy.count > 0),
+    help:
+      fingerBuy.count > 0 || (argonUnlocked && toeBuy.count > 0) ||
+      (xenonUnlocked && ghostBuy.count > 0),
     gas: !!nxGas && canAfford(state, nxGas.unlockCost),
     power: unlockedGases.some((g) => powerKinds.some((k) => bulkCost(state, k, g.id, 1).count > 0)),
   };
@@ -1335,7 +1503,7 @@ export default function App() {
           <div className="flex items-baseline justify-between">
             <span className="text-[9px] tracking-widest text-white/50">PLASMA BALL</span>
             <span className="text-[9px] tracking-widest text-white/50">
-              {state.fingers} FING · {state.toes} FEET
+              {state.fingers} FING · {state.toes} FEET · {state.ghosts} GHO
             </span>
           </div>
           <div className="mt-1 flex gap-1">
@@ -1383,6 +1551,7 @@ export default function App() {
             crackles={state.crackles}
             neonPow={neonPow}
             buzzOn={buzz}
+            ghosts={state.ghosts}
             onCrackle={crackle}
           />
         </div>
@@ -1492,6 +1661,26 @@ export default function App() {
                         <UnlockBar cost={{ argon: 15 }} color={gasById("argon").color} />
                       </React.Fragment>
                     )}
+                  {xenonUnlocked
+                    ? upRow(
+                        "GHOST HAND",
+                        `THE PLASMA PRESSES BACK · 20X A FINGER · OWN ${state.ghosts}` +
+                          (ghostBuy.count > 1 ? ` · +${ghostBuy.count}` : ""),
+                        ghostBuy.cost,
+                        <PixelIcon sprite={GHOST_SPRITE} palette={GHOST_PALETTE} px={3} />,
+                        () => buy("ghost"), ghostBuy.count === 0, "#b7b2ff",
+                      )
+                    : (
+                      <React.Fragment>
+                        {upRow(
+                          "GHOST HAND", "UNLOCKS WITH XENON GAS",
+                          { xenon: 80 },
+                          <PixelIcon sprite={GHOST_SPRITE} palette={GHOST_PALETTE} px={3} />,
+                          () => {}, true,
+                        )}
+                        <UnlockBar cost={{ xenon: 80 }} color={gasById("xenon").color} />
+                      </React.Fragment>
+                    )}
                 </>
               )}
 
@@ -1583,6 +1772,7 @@ export default function App() {
                 ["TOTAL CRACKLES", String(state.crackles)],
                 ["FINGERS HIRED", String(state.fingers)],
                 ["FEET HIRED", String(state.toes)],
+                ["GHOST HANDS", String(state.ghosts)],
                 ["TIME PLAYED", `${Math.floor(playSec / 3600)}H ${Math.floor((playSec % 3600) / 60)}M`],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between border-b border-white/10 px-1 py-1.5">
@@ -1651,11 +1841,10 @@ export default function App() {
                 {confirmReset ? "TAP AGAIN TO CONFIRM RESET" : "RESET SAVE"}
               </button>
               <p className="px-1 text-[9px] leading-relaxed text-white/30">
-                V10.1 · FEEL &amp; FEEDBACK — TOASTS AND BUZZ ON EVERY BUY,
-                AFFORDABLE DOTS ON THE SUB-TABS, A STICKY BUY BAR, UNLOCK
-                PROGRESS BARS, AND OPTIONS THAT STAY SAVED. STILL ONE STRING
-                PER FINGER (EACH SPLIT BRANCH 0.75X) WITH BULK BUY
-                ×1/×5/×10/×100/MAX.
+                V11 · THE PLASMA PRESSES BACK — GHOST HANDS REACH FROM THE
+                ELECTRODE AND HOLD THE GLASS FROM INSIDE (20X A FINGER,
+                MANIFEST → HOLD → DISSOLVE), AND LIVING STATIC MOTES DRIFT
+                IN THE BALL EVEN WHEN IDLE.
               </p>
             </div>
           )}
