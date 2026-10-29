@@ -2,12 +2,12 @@
 import React, { useEffect, useRef, useState } from "react";
 
 // ============================================================
-// IDLE PLASMA BALL — v11 "THE PLASMA PRESSES BACK"
-// - v10: SPLIT-forked strings, bulk buy, multi-gas costs, micro-volts
-// - v10.1: toasts, haptics, afford dots, sticky BUY bar, unlock bars
-// - v11: GHOST HANDS — the plasma presses back from inside the
-//   glass (20x a finger, manifest → hold → dissolve), and living
-//   static motes drifting inside the ball even when idle
+// IDLE PLASMA BALL — v11.1 "STEADY HANDS"
+// - v11.1: max 2 player touches (stuck-pointer bugfix + window
+//   cleanup), helpers & ghosts face the ball in 8 directions,
+//   every upgrade always shows its next price
+// - v11: ghost hands pressing from inside + living static motes
+// - v10.x: split strings, bulk buy, toasts/haptics, micro-volts
 // Logic block is framework-free → Vite + Capacitor.
 // ============================================================
 
@@ -170,6 +170,21 @@ const bulkCost = (
   }
   return { cost: total, count: n };
 };
+
+// price of the next single unit — shown when you can't afford any
+function peekCost(s: GameState, kind: BuyKind, gid?: GasId): Partial<GasRecord> {
+  if (kind === "finger") return fingerCost(s.fingers, s.unlocked);
+  if (kind === "toe") return toeCost(s.toes, s.unlocked);
+  if (kind === "ghost") return ghostCost(s.ghosts);
+  if (kind === "filament" && gid)
+    return s.filaments[gid] >= gasById(gid).cap ? {} : filamentCost(gid, s.filaments[gid]);
+  if (kind === "voltage" && gid)
+    return s.voltage[gid] >= MAX_VOLT_STEPS ? {} : voltageCost(gid, s.voltage[gid]);
+  if (kind === "split" && gid)
+    return s.splits[gid] >= SPLIT_CAP ? {} : splitCost(gid, s.splits[gid]);
+  if (kind === "gas") return nextGas(s.unlocked)?.unlockCost ?? {};
+  return {};
+}
 
 function fmt(n: number): string {
   if (n < 0.005) return "0";
@@ -402,24 +417,43 @@ function rotCW(s: string[]): string[] {
   }
   return out;
 }
-const FINGER_ORIENTS = [
-  FINGER_SPRITE,
-  rotCW(FINGER_SPRITE),
-  rotCW(rotCW(FINGER_SPRITE)),
-  rotCW(rotCW(rotCW(FINGER_SPRITE))),
-];
-const FOOT_ORIENTS = [
-  FOOT_SPRITE,
-  rotCW(FOOT_SPRITE),
-  rotCW(rotCW(FOOT_SPRITE)),
-  rotCW(rotCW(rotCW(FOOT_SPRITE))),
-];
-const GHOST_ORIENTS = [
-  GHOST_SPRITE,
-  rotCW(GHOST_SPRITE),
-  rotCW(rotCW(GHOST_SPRITE)),
-  rotCW(rotCW(rotCW(GHOST_SPRITE))),
-];
+
+// 45° nearest-neighbour rotation → helpers face the ball in 8 ways
+function rot45(s: string[]): string[] {
+  const H = s.length;
+  const W = s[0].length;
+  const D = Math.ceil((W + H) / Math.SQRT2) + 1;
+  const cos = Math.cos(Math.PI / 4);
+  const sin = Math.sin(Math.PI / 4);
+  const cx = (W - 1) / 2;
+  const cy = (H - 1) / 2;
+  const mid = (D - 1) / 2;
+  const out: string[] = [];
+  for (let y = 0; y < D; y++) {
+    let row = "";
+    for (let x = 0; x < D; x++) {
+      const dx = x - mid;
+      const dy = y - mid;
+      const sx = Math.round(dx * cos + dy * sin + cx);
+      const sy = Math.round(-dx * sin + dy * cos + cy);
+      row +=
+        sy >= 0 && sy < H && sx >= 0 && sx < W && s[sy][sx] !== "."
+          ? s[sy][sx]
+          : ".";
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+// 8 orientations at 45° steps: 0, 45, 90 ... 315 (clockwise)
+function sprOrients8(spr: string[]): string[][] {
+  const q = [spr, rotCW(spr), rotCW(rotCW(spr)), rotCW(rotCW(rotCW(spr)))];
+  return [q[0], rot45(q[0]), q[1], rot45(q[1]), q[2], rot45(q[2]), q[3], rot45(q[3])];
+}
+const FINGER_ORIENTS = sprOrients8(FINGER_SPRITE);
+const FOOT_ORIENTS = sprOrients8(FOOT_SPRITE);
+const GHOST_ORIENTS = sprOrients8(GHOST_SPRITE);
 
 function drawSprite(
   ctx: CanvasRenderingContext2D,
@@ -445,11 +479,11 @@ function drawOriented(
   palette: Record<string, string>,
 ) {
   const inwardA = angle + Math.PI;
-  const idx = ((Math.round((inwardA + Math.PI / 2) / (Math.PI / 2)) % 4) + 4) % 4;
+  const idx = ((Math.round((inwardA + Math.PI / 2) / (Math.PI / 4)) % 8) + 8) % 8;
   const spr = orients[idx];
   const w = spr[0].length;
   const h = spr.length;
-  const len = idx % 2 === 0 ? h : w;
+  const len = Math.max(w, h);
   const rad = R - 1 - Math.round(press * 2) + len / 2;
   drawSprite(
     ctx, spr,
@@ -467,7 +501,7 @@ function drawGhost(
   alpha: number,
   t: number,
 ) {
-  const idx = ((Math.round((angle + Math.PI / 2) / (Math.PI / 2)) % 4) + 4) % 4;
+  const idx = ((Math.round((angle + Math.PI / 2) / (Math.PI / 4)) % 8) + 8) % 8;
   const spr = GHOST_ORIENTS[idx];
   const w = spr[0].length;
   const h = spr.length;
@@ -1206,7 +1240,18 @@ function PlasmaBall({
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
+    // safety net: never leave a stuck pointer holding the glass
+    const rmPointer = (ev: PointerEvent) => pointers.current.delete(ev.pointerId);
+    const clearPointers = () => pointers.current.clear();
+    window.addEventListener("pointerup", rmPointer);
+    window.addEventListener("pointercancel", rmPointer);
+    window.addEventListener("blur", clearPointers);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("pointerup", rmPointer);
+      window.removeEventListener("pointercancel", rmPointer);
+      window.removeEventListener("blur", clearPointers);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1226,6 +1271,8 @@ function PlasmaBall({
         imageRendering: "pixelated", touchAction: "none",
       }}
       onPointerDown={(e) => {
+        // max 2 player touches — a third finger is ignored
+        if (pointers.current.size >= 2 && !pointers.current.has(e.pointerId)) return;
         e.currentTarget.setPointerCapture(e.pointerId);
         const p = toLocal(e);
         pointers.current.set(e.pointerId, p);
@@ -1451,6 +1498,7 @@ export default function App() {
     cost: Partial<GasRecord>,
     icon: React.ReactNode,
     onBuy: () => void, disabled: boolean, color?: string,
+    nextCost?: Partial<GasRecord>,
   ) => (
     <button
       onClick={onBuy}
@@ -1466,7 +1514,7 @@ export default function App() {
         <div className="text-[10px] font-bold leading-none" style={color ? { color } : undefined}>{name}</div>
         <div className="mt-0.5 truncate text-[8px] leading-tight text-white/45">{sub}</div>
       </div>
-      <CostChips cost={cost} ok={!disabled} />
+      <CostChips cost={disabled && nextCost ? nextCost : cost} ok={!disabled} />
     </button>
   );
 
@@ -1640,6 +1688,7 @@ export default function App() {
                     fingerBuy.cost,
                     <PixelIcon sprite={FINGER_SPRITE} palette={SKIN_PALETTE} px={2} />,
                     () => buy("finger"), fingerBuy.count === 0,
+                    undefined, peekCost(state, "finger"),
                   )}
                   {argonUnlocked
                     ? upRow(
@@ -1649,6 +1698,7 @@ export default function App() {
                         toeBuy.cost,
                         <PixelIcon sprite={FOOT_SPRITE} palette={SKIN_PALETTE} px={3} />,
                         () => buy("toe"), toeBuy.count === 0, SKIN,
+                        peekCost(state, "toe"),
                       )
                     : (
                       <React.Fragment>
@@ -1669,6 +1719,7 @@ export default function App() {
                         ghostBuy.cost,
                         <PixelIcon sprite={GHOST_SPRITE} palette={GHOST_PALETTE} px={3} />,
                         () => buy("ghost"), ghostBuy.count === 0, "#b7b2ff",
+                        peekCost(state, "ghost"),
                       )
                     : (
                       <React.Fragment>
@@ -1737,6 +1788,7 @@ export default function App() {
                           () => buy("filament", g.id),
                           filBuy.count === 0,
                           g.color,
+                          peekCost(state, "filament", g.id),
                         )}
                         {upRow(
                           `${g.name} VOLTS`,
@@ -1747,6 +1799,7 @@ export default function App() {
                           () => buy("voltage", g.id),
                           voltBuy.count === 0,
                           g.color,
+                          peekCost(state, "voltage", g.id),
                         )}
                         {upRow(
                           `${g.name} SPLIT`,
@@ -1757,6 +1810,7 @@ export default function App() {
                           () => buy("split", g.id),
                           splitBuy.count === 0,
                           g.color,
+                          peekCost(state, "split", g.id),
                         )}
                       </React.Fragment>
                     );
@@ -1841,10 +1895,10 @@ export default function App() {
                 {confirmReset ? "TAP AGAIN TO CONFIRM RESET" : "RESET SAVE"}
               </button>
               <p className="px-1 text-[9px] leading-relaxed text-white/30">
-                V11 · THE PLASMA PRESSES BACK — GHOST HANDS REACH FROM THE
-                ELECTRODE AND HOLD THE GLASS FROM INSIDE (20X A FINGER,
-                MANIFEST → HOLD → DISSOLVE), AND LIVING STATIC MOTES DRIFT
-                IN THE BALL EVEN WHEN IDLE.
+                V11.1 · STEADY HANDS — MAX 2 PLAYER TOUCHES (NO MORE STUCK
+                FINGERS), FINGERS, TOES AND GHOST HANDS NOW FACE THE BALL
+                IN 8 DIRECTIONS, AND EVERY UPGRADE ALWAYS SHOWS ITS NEXT
+                PRICE, AFFORDABLE OR NOT.
               </p>
             </div>
           )}
