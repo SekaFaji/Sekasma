@@ -90,17 +90,16 @@ test("reset confirmation offers distinct cancel and confirm actions", () => {
   assert.match(html, /role="group"/);
 });
 
-test("upgrade tabs and quantity selectors expose their selected states", async () => {
+test("upgrade category tabs expose their selected states", async () => {
   const { freshSave } = await import("../src/game/save.ts");
   const { gasById } = await import("../src/game/gases.ts");
   const html = renderToStaticMarkup(React.createElement(UpgradePanel, {
     state: freshSave(), unlockedGases: [gasById("neon")], accent: "#f582aa",
-    upTab: "help", onUpTabChange() {}, qty: 5, onQtyChange() {}, onBuy() {},
+    upTab: "help", onUpTabChange() {}, qty: 5, onBuy() {},
   }));
   assert.match(html, /role="tablist"/);
   assert.match(html, /role="tabpanel"/);
   assert.match(html, /aria-selected="true"/);
-  assert.match(html, /aria-pressed="true"/);
   assert.match(html, /aria-controls="upgrade-panel-help"/);
 });
 
@@ -110,6 +109,7 @@ test("currency header keeps gas totals in distinct, wrapping cards", async () =>
   const state = { ...freshSave(), unlocked: ["neon", "argon", "xenon"] };
   const html = renderToStaticMarkup(React.createElement(CurrencyHeader, {
     state, gases: GAS_LIST, rates: { neon: 0, argon: 0, xenon: 0 },
+    qty: 1, onQtyChange() {},
   }));
   assert.match(html, /repeat\(3, minmax\(0, 1fr\)\)/);
   for (const name of ["NEON", "ARGON", "XENON"]) assert.match(html, new RegExp(name));
@@ -125,13 +125,45 @@ test("app exposes a flexible ball area and a separate scrollable upgrades panel"
   assert.match(html, /sekasma-scroll/);
 });
 
-test("upgrade category and bulk-quantity controls have 44px touch targets", async () => {
+test("all five bulk-buy choices are in one compact header selector", async () => {
   const { freshSave } = await import("../src/game/save.ts");
   const { gasById } = await import("../src/game/gases.ts");
-  const html = renderToStaticMarkup(React.createElement(UpgradePanel, {
-    state: freshSave(), unlockedGases: [gasById("neon")], accent: "#f582aa",
-    upTab: "help", onUpTabChange() {}, qty: 10, onQtyChange() {}, onBuy() {},
+  const state = freshSave();
+  const header = renderToStaticMarkup(React.createElement(CurrencyHeader, {
+    state, gases: [gasById("neon")], rates: plasma(0), qty: 10, onQtyChange() {},
   }));
-  assert.equal((html.match(/min-h-\[44px\]/g) ?? []).length, 8);
-  assert.match(html, /aria-pressed="true"/);
+  const upgrades = renderToStaticMarkup(React.createElement(UpgradePanel, {
+    state, unlockedGases: [gasById("neon")], accent: "#f582aa",
+    upTab: "help", onUpTabChange() {}, qty: 10, onBuy() {},
+  }));
+  assert.match(header, /aria-label="Bulk buy quantity"/);
+  for (const choice of ["1", "5", "10", "100", "max"])
+    assert.ok(header.includes(`value="${choice}"`), choice);
+  assert.match(header, /value="10" selected=""/);
+  assert.doesNotMatch(upgrades, /Bulk buy quantity|aria-pressed=/);
+  assert.ok(upgrades.includes("min-h-[36px]"));
+});
+
+test("unaffordable but available upgrades retain an unobtrusive 0% meter", () => {
+  const html = renderToStaticMarkup(React.createElement(UpgradeRow, {
+    name: "FINGER", sub: "ALL GASES", icon: "F", onBuy() {},
+    cost: {}, nextCost: { neon: 100 }, plasma: plasma(0), disabled: true,
+  }));
+  assert.match(html, /aria-valuenow="0"/);
+  assert.match(html, /0%/);
+  assert.ok(html.includes("h-[2px]"));
+});
+
+test("original HELP, GAS and POWER upgrades remain visible", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const state = freshSave();
+  const shared = { state, unlockedGases: [gasById("neon")], accent: "#f582aa",
+    onUpTabChange() {}, qty: "max", onBuy() {} };
+  const help = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "help" }));
+  const gas = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "gas" }));
+  const power = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "power" }));
+  for (const label of ["FINGER", "BIG TOE", "GHOST HAND"]) assert.match(help, new RegExp(label));
+  assert.match(gas, /ARGON GAS/);
+  for (const label of ["NEON ARC", "NEON VOLTS", "NEON SPLIT"]) assert.match(power, new RegExp(label));
 });

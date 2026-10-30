@@ -27,23 +27,23 @@ html, body, #root {
    cqh is the actual height left after the header, controls and upgrade panel. */
 .sekasma-ball-area { container-type: size; }
 .sekasma-ball-canvas {
-  width: min(100%, 36vh, 300px);
-  width: min(100%, 36dvh, 300px);
+  width: min(100%, 30vh, 240px);
+  width: min(100%, 30dvh, 240px);
   height: auto;
 }
 @supports (width: 1cqh) {
-  .sekasma-ball-canvas { width: min(100cqw, 100cqh, 300px); }
+  .sekasma-ball-canvas { width: min(100cqw, 100cqh, 240px); }
 }
 /* Older mobile browsers use vh; modern browsers use the visible viewport. */
 .sekasma-panel-shell {
-  height: min(43vh, 480px);
-  height: min(43dvh, 480px);
+  height: min(40vh, 400px);
+  height: min(40dvh, 400px);
 }
 /* Short phones leave more room to interact with the plasma ball. */
 @media (max-height: 640px) {
   .sekasma-panel-shell {
-    height: min(38vh, 260px);
-    height: min(38dvh, 260px);
+    height: min(38vh, 252px);
+    height: min(38dvh, 252px);
   }
 }
 /* No horizontal overflow when three gas balances are present on narrow devices. */

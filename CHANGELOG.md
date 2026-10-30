@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.11 - Compact UI correction
+
+- Move x1/x5/x10/x100/MAX bulk buying to one compact BUY dropdown in the top status header
+- Reduce upgrade row, icon, tab, currency header and plasma ball dimensions
+- Restore 0% progress for unavailable-but-unlocked purchases without restoring meaningless locked meters
+- Remember each category's scroll position rather than discarding it on tab switches
+- Preserve original upgrade categories, buying quantities and effects; add regression tests
+- No new gameplay content, assets, balance or save schema changes
+
+
 ## 0.12.10 - Responsive mobile layout and readability
 
 - Size the square plasma canvas from the actual available display area using CSS container units with viewport fallbacks

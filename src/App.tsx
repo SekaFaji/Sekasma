@@ -31,6 +31,7 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null);
   const toastT = useRef<number | undefined>(undefined);
   const panelScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollPositionsRef = useRef<Record<string, number>>({});
   const [confirmReset, setConfirmReset] = useState(false);
   const stateRef = useRef(state);
   const restored = useRef(false);
@@ -140,16 +141,29 @@ export default function App() {
     }
   };
 
-  // Reset list position when changing sections; otherwise a short tab can open
-  // at the previous tab's deep scroll offset on small Android screens.
+  // Preserve each section's place, including independent upgrade categories.
+  const viewKey = (main: Tab, upgrade: UpTab) =>
+    main === "upgrades" ? `upgrades:${upgrade}` : main;
+  const rememberScroll = () => {
+    if (panelScrollRef.current)
+      scrollPositionsRef.current[viewKey(tab, upTab)] = panelScrollRef.current.scrollTop;
+  };
+  const restoreScroll = (key: string) => {
+    window.requestAnimationFrame(() => {
+      if (panelScrollRef.current)
+        panelScrollRef.current.scrollTop = scrollPositionsRef.current[key] ?? 0;
+    });
+  };
   const switchMainTab = (next: Tab) => {
+    rememberScroll();
     setTab(next);
     setConfirmReset(false);
-    if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
+    restoreScroll(viewKey(next, upTab));
   };
   const switchUpgradeTab = (next: UpTab) => {
+    rememberScroll();
     setUpTab(next);
-    if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
+    restoreScroll(viewKey("upgrades", next));
   };
 
   const playSec = Math.floor(state.activeSeconds);
@@ -167,7 +181,7 @@ export default function App() {
           />
         )}
 
-        <CurrencyHeader state={state} gases={unlockedGases} rates={rates} />
+        <CurrencyHeader state={state} gases={unlockedGases} rates={rates} qty={qty} onQtyChange={setQty} />
 
         {saveWarning && (
           <div role="alert" className="border-b border-[#ffb86b]/40 bg-[#35200c] px-3 py-2 text-[11px] text-[#ffd8a4]">
@@ -215,7 +229,7 @@ export default function App() {
               key={id}
               onClick={() => switchMainTab(id)}
               aria-current={tab === id ? "page" : undefined}
-              className={`min-h-[44px] py-2 text-[11px] tracking-widest active:translate-y-[1px] ${
+              className={`min-h-[40px] py-1 text-[11px] tracking-wide active:translate-y-[1px] ${
                 tab === id ? "bg-[#1b1233] text-white" : "text-white/70"
               }`}
               style={tab === id ? { borderBottom: `3px solid ${accent}` } : { borderBottom: "3px solid transparent" }}
@@ -230,8 +244,7 @@ export default function App() {
           <div ref={panelScrollRef} className="sekasma-scroll h-full overflow-y-auto overscroll-contain bg-[#0d0820] p-2">
           {tab === "upgrades" && (
             <UpgradePanel state={state} unlockedGases={unlockedGases} accent={accent}
-              upTab={upTab} onUpTabChange={switchUpgradeTab} qty={qty}
-              onQtyChange={setQty} onBuy={buy} />
+              upTab={upTab} onUpTabChange={switchUpgradeTab} qty={qty} onBuy={buy} />
           )}
 
           {tab === "stats" && (

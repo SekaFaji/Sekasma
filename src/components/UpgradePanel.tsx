@@ -14,10 +14,10 @@ import type { Gas, GasId, GameState } from "../game/types";
 
 export type UpTab = "help" | "gas" | "power";
 
-export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUpTabChange, qty, onQtyChange, onBuy }: {
+export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUpTabChange, qty, onBuy }: {
   state: GameState; unlockedGases: Gas[]; accent: string;
   upTab: UpTab; onUpTabChange: (tab: UpTab) => void;
-  qty: number | "max"; onQtyChange: (q: number | "max") => void;
+  qty: number | "max";
   onBuy: (kind: BuyKind, gid?: GasId) => void;
 }) {
   const bulkWant = qty === "max" ? 1000 : qty;
@@ -41,9 +41,9 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
   const buy = onBuy;
 
   return (
-            <div className="flex flex-col gap-1.5">
-              {/* sticky sub-tab + BUY bar */}
-              <div className="sticky top-0 z-10 -mx-2 mb-1 bg-[#0d0820] px-2 pt-0.5">
+            <div className="flex flex-col gap-1">
+              {/* Category tabs only. The compact bulk selector lives above the game. */}
+              <div className="sticky top-0 z-10 -mx-2 bg-[#0d0820] px-2 pb-0.5 pt-0.5">
                 <div role="tablist" aria-label="Upgrade categories" className="grid grid-cols-3 overflow-hidden border border-white/20 bg-[#140c2b]">
                   {([
                     ["help", "HELP"],
@@ -58,7 +58,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                       role="tab"
                       aria-controls={`upgrade-panel-${id}`}
                       aria-selected={upTab === id}
-                      className={`min-h-[44px] border-r border-white/10 py-1 text-[11px] tracking-widest active:translate-y-[1px] ${
+                      className={`min-h-[36px] border-r border-white/10 py-1 text-[11px] tracking-wide active:translate-y-[1px] ${
                         upTab === id ? "bg-[#21153f] text-white" : "text-white/65"
                       }`}
                       style={upTab === id ? { borderBottom: `2px solid ${accent}` } : { borderBottom: "2px solid transparent" }}
@@ -71,33 +71,15 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                   ))}
                 </div>
 
-                {/* buy quantity selector */}
-                {upTab !== "gas" && (
-                  <div className="mt-1 flex items-center gap-1">
-                    <span className="shrink-0 text-[11px] tracking-widest text-white/70">BUY</span>
-                    {([1, 5, 10, 100, "max"] as (number | "max")[]).map((q) => (
-                      <button
-                        key={String(q)}
-                        type="button"
-                        aria-pressed={qty === q}
-                        onClick={() => onQtyChange(q)}
-                        className={`min-h-[44px] flex-1 border py-1 text-[11px] tabular-nums active:translate-y-[1px] ${
-                          qty === q ? "border-white/60 bg-[#21153f] text-white" : "border-white/20 text-white/75"
-                        }`}
-                      >
-                        {q === "max" ? "MAX" : `×${q}`}
-                      </button>
-                    ))}
-                  </div>
-                )}
+
               </div>
 
-              <div id={`upgrade-panel-${upTab}`} role="tabpanel" aria-labelledby={`upgrade-tab-${upTab}`}>
+              <div id={`upgrade-panel-${upTab}`} role="tabpanel" aria-labelledby={`upgrade-tab-${upTab}`} className="flex flex-col gap-1">
               {upTab === "help" && (
                 <>
                   <UpgradeRow
                     name="FINGER"
-                    sub={`PRESSES ALL GASES · OWN ${state.fingers}` +
+                    sub={`ALL GASES · OWN ${state.fingers}` +
                       (fingerBuy.count > 1 ? ` · +${fingerBuy.count}` : "")}
                     cost={fingerBuy.cost}
                     icon={<PixelIcon sprite={FINGER_SPRITE} palette={SKIN_PALETTE} px={2} />}
@@ -109,7 +91,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                   {argonUnlocked
                     ? <UpgradeRow
                         name="BIG TOE"
-                        sub={`A WHOLE FOOT · PRESSES 8X HARDER · OWN ${state.toes}` +
+                        sub={`8× FINGER · OWN ${state.toes}` +
                           (toeBuy.count > 1 ? ` · +${toeBuy.count}` : "")}
                         cost={toeBuy.cost}
                         icon={<PixelIcon sprite={FOOT_SPRITE} palette={SKIN_PALETTE} px={3} />}
@@ -135,7 +117,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                   {xenonUnlocked
                     ? <UpgradeRow
                         name="GHOST HAND"
-                        sub={`THE PLASMA PRESSES BACK · 20X A FINGER · OWN ${state.ghosts}` +
+                        sub={`20× FINGER · OWN ${state.ghosts}` +
                           (ghostBuy.count > 1 ? ` · +${ghostBuy.count}` : "")}
                         cost={ghostBuy.cost}
                         icon={<PixelIcon sprite={GHOST_SPRITE} palette={GHOST_PALETTE} px={3} />}
@@ -177,7 +159,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                       <React.Fragment>
                         <UpgradeRow
                           name={`${nxGas.name} GAS`}
-                          sub={`FILL THE BALL · NEW CURRENCY · ${fmt(nxGas.baseRate)}/TAP BASE`}
+                          sub={`NEW CURRENCY · ${fmt(nxGas.baseRate)}/TAP BASE`}
                           cost={nxGas.unlockCost}
                           icon={<PixelIcon sprite={GAS_ICON} color={nxGas.color} px={3} />}
                           onBuy={() => buy("gas")}
@@ -214,7 +196,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                         </div>
                         <UpgradeRow
                           name={`${g.name} ARC`}
-                          sub={`+1 STRING · ${fmt(cracklePower(g, state))} → ${fmt(nextPow)}/TAP · ${fil}/${g.cap}` +
+                          sub={`+1 ARC · ${fmt(cracklePower(g, state))}→${fmt(nextPow)}/T · ${fil}/${g.cap}` +
                             (filBuy.count > 1 ? ` · +${filBuy.count}` : "")}
                           cost={filBuy.cost}
                           icon={<PixelIcon sprite={FIL_ICON} color={g.color} px={3} />}
@@ -226,7 +208,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                         />
                         <UpgradeRow
                           name={`${g.name} VOLTS`}
-                          sub={`+0.0001V · NOW ${fmtVolts(steps)} · X${voltMult(steps).toFixed(4)} OUTPUT` +
+                          sub={`+0.0001V · ${fmtVolts(steps)} · X${voltMult(steps).toFixed(4)}` +
                             (voltBuy.count > 1 ? ` · +${voltBuy.count} STEPS` : "")}
                           cost={voltBuy.cost}
                           icon={<PixelIcon sprite={VOLT_ICON} color={g.color} px={3} />}
@@ -238,7 +220,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                         />
                         <UpgradeRow
                           name={`${g.name} SPLIT`}
-                          sub={`+1 BRANCH · EACH 0.75X · NOW X${splitMult(spl).toFixed(2)} · ${spl}/${SPLIT_CAP}` +
+                          sub={`+1 BRANCH (0.75×) · X${splitMult(spl).toFixed(2)} · ${spl}/${SPLIT_CAP}` +
                             (splitBuy.count > 1 ? ` · +${splitBuy.count}` : "")}
                           cost={splitBuy.cost}
                           icon={<PixelIcon sprite={SPLIT_ICON} color={g.color} px={3} />}
