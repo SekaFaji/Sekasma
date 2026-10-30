@@ -245,8 +245,11 @@ export default function PlasmaBall({
           };
 
     const draw = (now: number) => {
+      // The browser may deliver a stale frame while transitioning to background.
+      // Never draw or advance held-touch effects while the page is hidden.
+      if (document.hidden) return;
       const t = (now - start) / 1000;
-      const dt = Math.min((now - last) / 1000, 0.1);
+      const dt = Math.max(0, Math.min((now - last) / 1000, 0.1));
       last = now;
 
       const { filaments: fil, fingers: fing, toes: toe, unlocked: u, crackles: crk } = propsRef.current;
@@ -521,18 +524,37 @@ export default function PlasmaBall({
 
       raf = requestAnimationFrame(draw);
     };
-    raf = requestAnimationFrame(draw);
-    // safety net: never leave a stuck pointer holding the glass
+    // Never retain a held finger across a tab switch, app suspension, or focus loss.
+    const clearPointers = () => {
+      pointers.current.clear();
+      holdArcs.current.length = 0;
+      holdNext = Infinity;
+    };
     const rmPointer = (ev: PointerEvent) => pointers.current.delete(ev.pointerId);
-    const clearPointers = () => pointers.current.clear();
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        clearPointers();
+        cancelAnimationFrame(raf);
+      } else {
+        // Do not simulate background time as a giant animation frame.
+        last = performance.now();
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(draw);
+      }
+    };
+
+    if (!document.hidden) raf = requestAnimationFrame(draw);
     window.addEventListener("pointerup", rmPointer);
     window.addEventListener("pointercancel", rmPointer);
     window.addEventListener("blur", clearPointers);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       cancelAnimationFrame(raf);
+      clearPointers();
       window.removeEventListener("pointerup", rmPointer);
       window.removeEventListener("pointercancel", rmPointer);
       window.removeEventListener("blur", clearPointers);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -582,6 +604,7 @@ export default function PlasmaBall({
       }}
       onPointerUp={(e) => pointers.current.delete(e.pointerId)}
       onPointerCancel={(e) => pointers.current.delete(e.pointerId)}
+      onLostPointerCapture={(e) => pointers.current.delete(e.pointerId)}
     />
   );
 }

@@ -92,6 +92,16 @@ Existing save keys are retained. The current primary snapshot and a previous-sna
 
 The repository contains an npm-generated `package-lock.json` (lockfile v3). Use **Node.js 22+** and `npm ci` to install exactly the locked dependency tree. CI and GitHub Pages both use `npm ci` so dependency resolution cannot drift between runs. If dependencies change intentionally, regenerate the lock with `npm install`, review the lockfile diff and commit both files together.
 
+## Mobile browser smoke test
+
+Before merging a renderer change, check the following on an actual phone:
+
+1. Hold a finger on the plasma ball, switch apps, then return. The game must **not** treat the old finger as held or generate manual crackles until a fresh touch.
+2. Repeat while two fingers are held; on return, both touches must be cleared.
+3. Lock and unlock the screen while touching the ball; confirm the canvas resumes animation without stuck fingers.
+4. Return after leaving the browser in the background and verify idle helpers earn the expected capped offline income once.
+5. Toggle between Upgrades, Stats and Options, reset and reload, and verify saved state and UI remain usable.
+
 ## Deployment
 
 Pushes to `main` are typechecked, tested and built by [CI](.github/workflows/ci.yml),

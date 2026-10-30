@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.6 — Mobile touch lifecycle safety
+
+- Release held touches and plasma arcs when the browser loses focus or the game is backgrounded
+- Stop requesting canvas animation frames while hidden, then resume with a fresh frame timestamp
+- Avoid phantom held-finger crackles after returning from a suspended mobile browser
+- Preserve game economy, purchases, save schema and progression balance unchanged
+
+
 ## 0.12.5 — Reproducible builds and static cleanup
 
 - Commit the genuine npm v10 lockfile generated on a GitHub-hosted Node 22 runner (185 packages)
