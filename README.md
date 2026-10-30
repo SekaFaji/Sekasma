@@ -96,6 +96,9 @@ The repository contains an npm-generated `package-lock.json` (lockfile v3). Use 
 
 ## Mobile browser smoke test
 
+Check that the small BUY dropdown in the top bar still offers x1/x5/x10/x100/MAX and affects purchases in HELP/POWER. All HELP/GAS/POWER upgrade rows and next-price chips remain present. Verify each tab remembers its scroll position, and that only genuine gas-gated helpers show LOCKED. These layout changes still require physical-phone verification.
+
+
 On short Android screens, confirm the ball remains square and touch positions follow the rendered ball (no stretching). Test both a short viewport and a narrow viewport with three gases, switch from a deeply scrolled POWER list to HELP or STATS, and verify the list begins at the top. Currency totals must wrap rather than overlap other cards. These checks require an actual browser; server-rendered UI tests cannot measure screen geometry.
 
 
