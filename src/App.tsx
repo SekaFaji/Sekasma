@@ -226,7 +226,7 @@ export default function App() {
           ] as [Tab, string][]).map(([id, label]) => (
             <button
               key={id}
-              onClick={() => setTab(id)}
+              onClick={() => { setTab(id); setConfirmReset(false); }}
               aria-current={tab === id ? "page" : undefined}
               className={`min-h-[44px] py-2 text-[11px] tracking-widest active:translate-y-[1px] ${
                 tab === id ? "bg-[#1b1233] text-white" : "text-white/70"
@@ -238,18 +238,9 @@ export default function App() {
           ))}
         </nav>
 
-        {/* panel — fixed height so switching tabs never moves the layout */}
-        <div className="sekasma-scroll relative h-[min(43dvh,480px)] min-h-0 shrink-0 overflow-y-auto overscroll-contain bg-[#0d0820] p-2">
-          {toast && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="sekasma-toast pointer-events-none sticky bottom-2 z-20 border-2 px-2 py-1.5 text-center text-[11px] tracking-widest"
-              style={{ borderColor: accent, color: accent, background: "#1b1233" }}
-            >
-              {toast}
-            </div>
-          )}
+        {/* Keep feedback anchored to the panel viewport, never inside scroll content. */}
+        <div className="relative h-[min(43dvh,480px)] min-h-0 shrink-0">
+          <div className="sekasma-scroll h-full overflow-y-auto overscroll-contain bg-[#0d0820] p-2">
           {tab === "upgrades" && (
             <UpgradePanel state={state} unlockedGases={unlockedGases} accent={accent}
               upTab={upTab} onUpTabChange={setUpTab} qty={qty}
@@ -266,6 +257,7 @@ export default function App() {
               confirmReset={confirmReset}
               onToggleScanlines={() => setScanlines((v) => !v)}
               onToggleBuzz={() => setBuzz((v) => !v)}
+              onCancelReset={() => setConfirmReset(false)}
               onReset={() => {
                 if (confirmReset) {
                   const fresh = resetSave();
@@ -277,6 +269,17 @@ export default function App() {
                 } else setConfirmReset(true);
               }}
             />
+          )}
+          </div>
+          {toast && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="sekasma-toast pointer-events-none absolute inset-x-2 bottom-2 z-20 border-2 px-2 py-1.5 text-center text-[11px] tracking-widest"
+              style={{ borderColor: accent, color: accent, background: "#1b1233" }}
+            >
+              {toast}
+            </div>
           )}
         </div>
       </div>

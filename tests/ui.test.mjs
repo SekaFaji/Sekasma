@@ -9,11 +9,15 @@ const plasma = (neon) => ({ neon, argon: 0, xenon: 0 });
 let server;
 let UpgradeRow;
 let App;
+let OptionsPanel;
+let UpgradePanel;
 
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: "custom", logLevel: "error" });
   ({ default: UpgradeRow } = await server.ssrLoadModule("/src/components/UpgradeRow.tsx"));
   ({ default: App } = await server.ssrLoadModule("/src/App.tsx"));
+  ({ default: OptionsPanel } = await server.ssrLoadModule("/src/components/OptionsPanel.tsx"));
+  ({ default: UpgradePanel } = await server.ssrLoadModule("/src/components/UpgradePanel.tsx"));
 });
 after(async () => { if (server) await server.close(); });
 
@@ -60,4 +64,40 @@ test("app renders navigation and upgrade cards with genuine React markup", () =>
   assert.match(html, /role="tablist"/);
   assert.match(html, /FINGER/);
   assert.match(html, /PLASMA BALL/);
+});
+
+test("settings show a neutral initial reset action and accessible pressed states", () => {
+  const html = renderToStaticMarkup(React.createElement(OptionsPanel, {
+    scanlines: true, buzz: false, confirmReset: false,
+    onToggleScanlines() {}, onToggleBuzz() {}, onReset() {}, onCancelReset() {},
+  }));
+  assert.match(html, /aria-pressed="true"/);
+  assert.match(html, /aria-pressed="false"/);
+  assert.match(html, /RESET SAVE/);
+  assert.doesNotMatch(html, /CONFIRM RESET/);
+});
+
+test("reset confirmation offers distinct cancel and confirm actions", () => {
+  const html = renderToStaticMarkup(React.createElement(OptionsPanel, {
+    scanlines: true, buzz: true, confirmReset: true,
+    onToggleScanlines() {}, onToggleBuzz() {}, onReset() {}, onCancelReset() {},
+  }));
+  assert.match(html, /RESET ALL SAVED PROGRESS/);
+  assert.match(html, /CANCEL/);
+  assert.match(html, /CONFIRM RESET/);
+  assert.match(html, /role="group"/);
+});
+
+test("upgrade tabs and quantity selectors expose their selected states", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const html = renderToStaticMarkup(React.createElement(UpgradePanel, {
+    state: freshSave(), unlockedGases: [gasById("neon")], accent: "#f582aa",
+    upTab: "help", onUpTabChange() {}, qty: 5, onQtyChange() {}, onBuy() {},
+  }));
+  assert.match(html, /role="tablist"/);
+  assert.match(html, /role="tabpanel"/);
+  assert.match(html, /aria-selected="true"/);
+  assert.match(html, /aria-pressed="true"/);
+  assert.match(html, /aria-controls="upgrade-panel-help"/);
 });
