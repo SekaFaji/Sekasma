@@ -1,25 +1,28 @@
-import type { GasId, GasRecord } from "../game/types";
+import type { GasRecord } from "../game/types";
+import { affordabilityPercent } from "../utils/progress";
 
-/** Progress bar showing how close the player is to a locked upgrade. */
-export default function UnlockBar({
-  cost,
-  color,
-  plasma,
-}: {
+/** Small, accessible affordability meter embedded inside its upgrade row. */
+export default function UnlockBar({ cost, color, plasma, label }: {
   cost: Partial<GasRecord>;
   color: string;
   plasma: GasRecord;
+  label: string;
 }) {
-  let pct = 1;
-  for (const [g, amt] of Object.entries(cost) as [GasId, number][])
-    pct = Math.min(pct, plasma[g] / amt);
-  const shown = Math.round(Math.max(0, Math.min(1, pct)) * 100);
+  const percent = affordabilityPercent(cost, plasma);
+  if (percent <= 0 || percent >= 100) return null;
   return (
-    <div className="mb-1 flex items-center gap-1 px-2 pt-0.5">
-      <div className="h-1.5 flex-1 border border-white/15 bg-[#0b0618]">
-        <div className="h-full" style={{ width: `${shown}%`, background: color }} />
+    <div className="mt-1 flex max-w-[144px] items-center gap-1.5">
+      <div
+        role="progressbar"
+        aria-label={`${label} affordability`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        className="h-[3px] min-w-0 flex-1 overflow-hidden bg-white/15"
+      >
+        <div className="h-full" style={{ width: `${percent}%`, background: color }} />
       </div>
-      <span className="shrink-0 text-[10px] tabular-nums text-white/40">{shown}%</span>
+      <span className="shrink-0 text-[10px] tabular-nums text-white/65">{percent}%</span>
     </div>
   );
 }

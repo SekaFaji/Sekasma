@@ -9,7 +9,6 @@ import UpgradeRow from "./components/UpgradeRow";
 import InfoRow from "./components/InfoRow";
 import StatsPanel from "./components/StatsPanel";
 import OptionsPanel from "./components/OptionsPanel";
-import UnlockBar from "./components/UnlockBar";
 import { GAS_LIST, gasById, nextGas } from "./game/gases";
 import { SPLIT_CAP, fmtVolts, splitMult, voltMult } from "./game/config";
 import { accrueIdle, bulkCost, buyMsg, canAfford, cappedOfflineSeconds, cracklePower, idleRate, peekCost, purchaseUpgrade } from "./game/economy";
@@ -174,8 +173,8 @@ export default function App() {
   const playSec = Math.floor(state.activeSeconds);
 
   return (
-    <div className="flex min-h-screen justify-center bg-[#05030f] font-mono text-white select-none">
-      <div className="relative flex min-h-screen w-full max-w-[400px] flex-col bg-[#08041a]">
+    <div className="flex h-screen h-dvh justify-center overflow-hidden bg-[#05030f] font-mono text-white select-none">
+      <div className="relative flex h-full min-h-0 w-full max-w-[400px] flex-col bg-[#08041a]">
         {scanlines && (
           <div
             className="pointer-events-none absolute inset-0 z-20"
@@ -235,7 +234,7 @@ export default function App() {
         )}
 
         {/* the ball */}
-        <div className="flex min-h-[20vh] flex-1 flex-col items-center justify-center px-4">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4">
           <PlasmaBall
             filaments={state.filaments}
             splits={state.splits}
@@ -251,7 +250,7 @@ export default function App() {
         </div>
 
         {/* tab bar */}
-        <nav className="grid grid-cols-3 border-t-2 border-white/15 bg-[#120a2e]">
+        <nav aria-label="Main sections" className="grid grid-cols-3 border-t border-white/20 bg-[#120a2e]">
           {([
             ["upgrades", "UPGRADES"],
             ["stats", "STATS"],
@@ -260,8 +259,9 @@ export default function App() {
             <button
               key={id}
               onClick={() => setTab(id)}
+              aria-current={tab === id ? "page" : undefined}
               className={`min-h-[44px] py-2 text-[11px] tracking-widest active:translate-y-[1px] ${
-                tab === id ? "bg-[#1b1233] text-white" : "text-white/40"
+                tab === id ? "bg-[#1b1233] text-white" : "text-white/70"
               }`}
               style={tab === id ? { borderBottom: `3px solid ${accent}` } : { borderBottom: "3px solid transparent" }}
             >
@@ -271,7 +271,7 @@ export default function App() {
         </nav>
 
         {/* panel — fixed height so switching tabs never moves the layout */}
-        <div className="relative h-[42vh] shrink-0 overflow-y-auto bg-[#0d0820] p-2">
+        <div className="sekasma-scroll relative h-[min(43dvh,480px)] min-h-0 shrink-0 overflow-y-auto overscroll-contain bg-[#0d0820] p-2">
           {toast && (
             <div
               className="pointer-events-none absolute inset-x-2 bottom-2 z-20 border-2 px-2 py-1.5 text-center text-[10px] tracking-widest"
@@ -284,7 +284,7 @@ export default function App() {
             <div className="flex flex-col gap-1.5">
               {/* sticky sub-tab + BUY bar */}
               <div className="sticky top-0 z-10 -mx-2 mb-1 bg-[#0d0820] px-2 pt-0.5">
-                <div className="grid grid-cols-3 border-2 border-white/15">
+                <div role="tablist" aria-label="Upgrade categories" className="grid grid-cols-3 overflow-hidden border border-white/20 bg-[#140c2b]">
                   {([
                     ["help", "HELP"],
                     ["gas", "GAS"],
@@ -293,8 +293,10 @@ export default function App() {
                     <button
                       key={id}
                       onClick={() => setUpTab(id)}
-                      className={`py-1 text-[10px] tracking-widest active:translate-y-[1px] ${
-                        upTab === id ? "bg-[#1b1233] text-white" : "text-white/40"
+                      role="tab"
+                      aria-selected={upTab === id}
+                      className={`min-h-[40px] border-r border-white/10 py-1 text-[11px] tracking-widest active:translate-y-[1px] ${
+                        upTab === id ? "bg-[#21153f] text-white" : "text-white/65"
                       }`}
                       style={upTab === id ? { borderBottom: `2px solid ${accent}` } : { borderBottom: "2px solid transparent" }}
                     >
@@ -314,8 +316,8 @@ export default function App() {
                       <button
                         key={String(q)}
                         onClick={() => setQty(q)}
-                        className={`flex-1 border py-1 text-[10px] tabular-nums active:translate-y-[1px] ${
-                          qty === q ? "border-white/60 bg-[#1b1233] text-white" : "border-white/15 text-white/40"
+                        className={`min-h-[40px] flex-1 border py-1 text-[11px] tabular-nums active:translate-y-[1px] ${
+                          qty === q ? "border-white/60 bg-[#21153f] text-white" : "border-white/20 text-white/75"
                         }`}
                       >
                         {q === "max" ? "MAX" : `×${q}`}
@@ -336,6 +338,7 @@ export default function App() {
                     onBuy={() => buy("finger")}
                     disabled={fingerBuy.count === 0}
                     nextCost={peekCost(state, "finger")}
+                          plasma={state.plasma}
                   />
                   {argonUnlocked
                     ? <UpgradeRow
@@ -348,6 +351,7 @@ export default function App() {
                         disabled={toeBuy.count === 0}
                         color={SKIN}
                         nextCost={peekCost(state, "toe")}
+                          plasma={state.plasma}
                       />
                     : (
                       <React.Fragment>
@@ -358,8 +362,8 @@ export default function App() {
                           icon={<PixelIcon sprite={FOOT_SPRITE} palette={SKIN_PALETTE} px={3} />}
                           onBuy={() => {}}
                           disabled
+                          locked
                         />
-                        <UnlockBar cost={{ argon: 15 }} color={gasById("argon").color} plasma={state.plasma} />
                       </React.Fragment>
                     )}
                   {xenonUnlocked
@@ -373,6 +377,7 @@ export default function App() {
                         disabled={ghostBuy.count === 0}
                         color="#b7b2ff"
                         nextCost={peekCost(state, "ghost")}
+                          plasma={state.plasma}
                       />
                     : (
                       <React.Fragment>
@@ -383,8 +388,8 @@ export default function App() {
                           icon={<PixelIcon sprite={GHOST_SPRITE} palette={GHOST_PALETTE} px={3} />}
                           onBuy={() => {}}
                           disabled
+                          locked
                         />
-                        <UnlockBar cost={{ xenon: 80 }} color={gasById("xenon").color} plasma={state.plasma} />
                       </React.Fragment>
                     )}
                 </>
@@ -411,9 +416,9 @@ export default function App() {
                           icon={<PixelIcon sprite={GAS_ICON} color={nxGas.color} px={3} />}
                           onBuy={() => buy("gas")}
                           disabled={!canAfford(state, nxGas.unlockCost)}
+                          plasma={state.plasma}
                           color={nxGas.color}
                         />
-                        <UnlockBar cost={nxGas.unlockCost} color={nxGas.color} plasma={state.plasma} />
                       </React.Fragment>
                     )
                     : (
@@ -451,6 +456,7 @@ export default function App() {
                           disabled={filBuy.count === 0}
                           color={g.color}
                           nextCost={peekCost(state, "filament", g.id)}
+                          plasma={state.plasma}
                         />
                         <UpgradeRow
                           name={`${g.name} VOLTS`}
@@ -462,6 +468,7 @@ export default function App() {
                           disabled={voltBuy.count === 0}
                           color={g.color}
                           nextCost={peekCost(state, "voltage", g.id)}
+                          plasma={state.plasma}
                         />
                         <UpgradeRow
                           name={`${g.name} SPLIT`}
@@ -473,6 +480,7 @@ export default function App() {
                           disabled={splitBuy.count === 0}
                           color={g.color}
                           nextCost={peekCost(state, "split", g.id)}
+                          plasma={state.plasma}
                         />
                       </React.Fragment>
                     );

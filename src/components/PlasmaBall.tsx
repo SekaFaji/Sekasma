@@ -571,7 +571,7 @@ export default function PlasmaBall({
       width={PX}
       height={PX}
       style={{
-        width: "100%", maxWidth: 300, height: "auto", display: "block",
+        width: "min(100%, 36dvh, 300px)", maxWidth: 300, height: "auto", display: "block",
         imageRendering: "pixelated", touchAction: "none",
       }}
       role="button"

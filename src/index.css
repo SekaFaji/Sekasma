@@ -8,3 +8,8 @@ html, body, #root {
   background: #05030f;
   overscroll-behavior: none;
 }
+
+/* Keep the upgrade list scrollable while making the scrollbar less intrusive. */
+.sekasma-scroll { scrollbar-width: thin; scrollbar-color: #574a80 #0d0820; }
+.sekasma-scroll::-webkit-scrollbar { width: 5px; }
+.sekasma-scroll::-webkit-scrollbar-thumb { background: #574a80; }
