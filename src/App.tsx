@@ -14,7 +14,8 @@ import { GAS_LIST, gasById, nextGas } from "./game/gases";
 import { SPLIT_CAP, fmtVolts, splitMult, voltMult } from "./game/config";
 import { accrueIdle, bulkCost, buyMsg, canAfford, cappedOfflineSeconds, cracklePower, idleRate, peekCost, purchaseUpgrade } from "./game/economy";
 import type { BuyKind } from "./game/economy";
-import { freshSave, loadOpts, loadSave, persist, saveOpts } from "./game/save";
+import { freshSave, loadOpts, loadSave, persist, resetSave, saveOpts } from "./game/save";
+import { measureTick } from "./game/timing";
 import { fmt } from "./utils/format";
 import { haptic } from "./utils/haptic";
 import {
@@ -35,6 +36,7 @@ type UpTab = "help" | "gas" | "power";
 export default function App() {
   const [state, setState] = useState<GameState>(() => loadSave() ?? freshSave());
   const [offlineGain, setOfflineGain] = useState<Partial<GasRecord> | null>(null);
+  const [saveWarning, setSaveWarning] = useState(false);
   const [tab, setTab] = useState<Tab>("upgrades");
   const [upTab, setUpTab] = useState<UpTab>("help");
   const [qty, setQty] = useState<number | "max">(1);
@@ -78,16 +80,18 @@ export default function App() {
     const timer = window.setInterval(() => {
       const now = Date.now();
       if (document.hidden) { last = now; return; }
-      const seconds = Math.max(0, Math.min((now - last) / 1000, 1.5));
+      const { incomeSeconds, activeSeconds } = measureTick(last, now);
       last = now;
-      if (seconds <= 0) return;
+      if (incomeSeconds <= 0) return;
       setState((s) => {
-        const credited = accrueIdle(s, seconds).state;
-        return { ...credited, activeSeconds: s.activeSeconds + seconds };
+        const credited = accrueIdle(s, incomeSeconds).state;
+        return activeSeconds > 0
+          ? { ...credited, activeSeconds: s.activeSeconds + activeSeconds }
+          : credited;
       });
     }, 1000);
     const autosave = window.setInterval(() => {
-      if (!document.hidden) persist(stateRef.current);
+      if (!document.hidden) setSaveWarning(!persist(stateRef.current));
     }, 2000);
     // If already hidden, retain the timestamp saved at the moment of hiding.
     // Re-saving on pagehide could erase hours of pending offline earnings.
@@ -210,6 +214,12 @@ export default function App() {
             ))}
           </div>
         </header>
+
+        {saveWarning && (
+          <div role="alert" className="border-b border-[#ffb86b]/40 bg-[#35200c] px-3 py-2 text-[11px] text-[#ffd8a4]">
+            SAVE UNAVAILABLE — PROGRESS MAY BE LOST WHEN THIS TAB CLOSES.
+          </div>
+        )}
 
         {offlineGain !== null && (
           <button
@@ -484,7 +494,11 @@ export default function App() {
               onToggleBuzz={() => setBuzz((v) => !v)}
               onReset={() => {
                 if (confirmReset) {
-                  setState(freshSave());
+                  const fresh = resetSave();
+                  stateRef.current = fresh;
+                  setState(fresh);
+                  setOfflineGain(null);
+                  setToast(null);
                   setConfirmReset(false);
                 } else setConfirmReset(true);
               }}

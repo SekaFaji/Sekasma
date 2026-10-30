@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { accrueIdle, bulkCost, cappedOfflineSeconds, fingerCost, purchaseUpgrade } from "../src/game/economy.ts";
 import { OFFLINE_CAP_S } from "../src/game/config.ts";
-import { freshSave, migrateSave } from "../src/game/save.ts";
+import { BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
+import { measureTick } from "../src/game/timing.ts";
 import { visibleHelperCount } from "../src/render/limits.ts";
 
 test("offline settlement is capped and handles negative time", () => {
@@ -90,4 +91,87 @@ test("visual helper caps never limit economy ownership or income", () => {
   assert.equal(visibleHelperCount(s.toes, "toes"), 12);
   assert.equal(visibleHelperCount(s.ghosts, "ghosts"), 10);
   assert.equal(visibleHelperCount(-10, "fingers"), 0);
+});
+
+function withStorage(run) {
+  const previousWindow = globalThis.window;
+  const items = new Map();
+  globalThis.window = {
+    localStorage: {
+      getItem: (key) => items.has(key) ? items.get(key) : null,
+      setItem: (key, value) => items.set(key, String(value)),
+      removeItem: (key) => items.delete(key),
+    },
+  };
+  try {
+    run(items);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+}
+
+test("save backup keeps the previous complete snapshot", () => withStorage((items) => {
+  const first = { ...freshSave(), fingers: 3 };
+  const second = { ...freshSave(), fingers: 7 };
+  assert.equal(persist(first), true);
+  assert.equal(persist(second), true);
+  assert.equal(JSON.parse(items.get(BACKUP_KEY)).fingers, 3);
+  assert.equal(loadSave().fingers, 7);
+}));
+
+test("malformed current save falls back to backup or legacy", () => withStorage((items) => {
+  const good = { ...freshSave(), fingers: 4, v: 12 };
+  items.set(SAVE_KEY, "{ broken JSON");
+  items.set(BACKUP_KEY, JSON.stringify(good));
+  assert.equal(loadSave().fingers, 4);
+  items.delete(BACKUP_KEY);
+  items.set(LEGACY_V9_KEY, JSON.stringify({ ...good, v: 9, fingers: 9 }));
+  assert.equal(loadSave().fingers, 9);
+}));
+
+test("reset clears current, backup and legacy progress immediately", () => withStorage((items) => {
+  persist({ ...freshSave(), fingers: 10 });
+  persist({ ...freshSave(), fingers: 20 });
+  items.set(LEGACY_V9_KEY, JSON.stringify({ ...freshSave(), fingers: 30, v: 9 }));
+  const result = resetSave();
+  assert.equal(result.fingers, 0);
+  assert.equal(loadSave().fingers, 0);
+  assert.equal(items.get(BACKUP_KEY), undefined);
+  assert.equal(items.get(LEGACY_V9_KEY), undefined);
+  assert.equal(JSON.parse(items.get(SAVE_KEY)).fingers, 0);
+}));
+
+test("normal game ticks account for visible time", () => {
+  assert.deepEqual(measureTick(1000, 2000), {
+    incomeSeconds: 1, activeSeconds: 1, stalled: false,
+  });
+});
+
+test("long stalls credit bounded income but not active playtime", () => {
+  assert.deepEqual(measureTick(0, 10_000), {
+    incomeSeconds: 10, activeSeconds: 0, stalled: true,
+  });
+  assert.equal(measureTick(0, 86_400_000).incomeSeconds, OFFLINE_CAP_S);
+  assert.equal(measureTick(1000, 0).incomeSeconds, 0);
+  assert.equal(measureTick(NaN, 1000).incomeSeconds, 0);
+});
+
+test("unavailable storage is reported and reset stays safe in memory", () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    localStorage: {
+      getItem: () => { throw new Error("blocked"); },
+      setItem: () => { throw new Error("blocked"); },
+      removeItem: () => { throw new Error("blocked"); },
+    },
+  };
+  try {
+    assert.equal(persist(freshSave()), false);
+    assert.equal(resetSave().fingers, 0);
+    assert.equal(loadSave(), null);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
 });

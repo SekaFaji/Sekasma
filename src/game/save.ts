@@ -7,6 +7,8 @@ import { MAX_VOLT_STEPS, SPLIT_CAP, VOLT_STEP, zero3 } from "./config.ts";
 import type { GasId, GameState } from "./types.ts";
 
 export const SAVE_KEY = "idle-plasma-ball-save-v10";
+// Keep the primary key stable for legacy installs. The internal schema is v12.
+export const BACKUP_KEY = "idle-plasma-ball-save-backup-v12";
 export const LEGACY_V9_KEY = "idle-plasma-ball-save-v9";
 export const LEGACY_V8_KEY = "idle-plasma-ball-save-v8";
 export const LEGACY_V6_KEY = "idle-plasma-ball-save-v6";
@@ -127,29 +129,60 @@ export function migrateSave(old: Record<string, unknown>): GameState {
   return base;
 }
 
+/** Try each slot independently: corrupt JSON must not block a valid backup. */
 export function loadSave(): GameState | null {
+  for (const key of [SAVE_KEY, BACKUP_KEY, LEGACY_V9_KEY, LEGACY_V8_KEY, LEGACY_V6_KEY]) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) continue;
+      const candidate = parsed as Record<string, unknown>;
+      if (typeof candidate.fingers !== "number" || !Number.isFinite(candidate.fingers)) continue;
+      return migrateSave(candidate);
+    } catch {
+      // A single bad slot must not hide other usable snapshots.
+    }
+  }
+  return null;
+}
+
+export function persist(s: GameState): boolean {
   try {
-    const raw =
-      window.localStorage.getItem(SAVE_KEY) ??
-      window.localStorage.getItem(LEGACY_V9_KEY) ??
-      window.localStorage.getItem(LEGACY_V8_KEY) ??
-      window.localStorage.getItem(LEGACY_V6_KEY);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    const s = parsed as Record<string, unknown>;
-    if (typeof s.fingers !== "number") return null;
-    return migrateSave(s);
+    const previous = window.localStorage.getItem(SAVE_KEY);
+    // Preserve the last readable primary snapshot before replacing it.
+    if (previous) {
+      try {
+        const parsed: unknown = JSON.parse(previous);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed) &&
+            typeof (parsed as Record<string, unknown>).fingers === "number" &&
+            Number.isFinite((parsed as Record<string, number>).fingers)) {
+          window.localStorage.setItem(BACKUP_KEY, previous);
+        }
+      } catch {
+        // Leave the existing backup untouched.
+      }
+    }
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 12 }));
+    return true;
   } catch {
-    return null;
+    // No storage (e.g. private browsing): retain the in-memory session.
+    return false;
   }
 }
-export function persist(s: GameState) {
+
+/** Reset both slots and all legacy keys before writing a genuinely fresh save. */
+export function resetSave(): GameState {
+  const fresh = freshSave();
   try {
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 12 }));
+    for (const key of [SAVE_KEY, BACKUP_KEY, LEGACY_V9_KEY, LEGACY_V8_KEY, LEGACY_V6_KEY]) {
+      window.localStorage.removeItem(key);
+    }
   } catch {
-    /* in-session only */
+    // Storage may be unavailable. The UI still resets in memory.
   }
+  persist(fresh);
+  return fresh;
 }
 
 

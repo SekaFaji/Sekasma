@@ -27,6 +27,13 @@ jobs:
       - name: Install dependencies
         run: npm install --no-fund --no-audit
 
+      # A Pages deployment must pass the same quality gates as CI.
+      - name: Unit tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Build
         run: npm run build
 

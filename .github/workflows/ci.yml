@@ -7,7 +7,7 @@ on:
 
 jobs:
   verify:
-    name: Typecheck & build
+    name: Tests, typecheck & build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -16,14 +16,15 @@ jobs:
         with:
           node-version: 22
 
+      # These pure TypeScript tests do not require an npm install.
+      - name: Unit tests
+        run: npm test
+
       - name: Install dependencies
         run: npm install --no-fund --no-audit
 
       - name: Typecheck
         run: npm run typecheck
-
-      - name: Unit tests
-        run: npm test
 
       - name: Build
         run: npm run build

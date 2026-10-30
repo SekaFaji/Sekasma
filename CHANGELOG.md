@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.4 — Save recovery and lifecycle safety
+
+- Keep a backup of the previous save before overwriting the primary snapshot
+- Recover corrupted current saves from the backup or a valid legacy save
+- Reset all save slots and legacy keys synchronously to prevent old saves from reappearing
+- Account for long timer stalls as capped idle income rather than losing progression or inflating playtime
+- Add save recovery, reset and paused-clock regression tests; run pure tests before dependency installation in CI
+- Warn when browser storage is unavailable and guard Pages deployment with tests and typechecking
+
+**Next build task:** Generate and commit a genuine `package-lock.json` using npm with registry access, then migrate CI and Pages to `npm ci`.
+
+
 ## 0.12.3 — Mobile polish and module cleanup
 
 - Extract statistics and options panels from the application shell
