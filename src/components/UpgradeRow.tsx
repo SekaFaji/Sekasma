@@ -34,7 +34,7 @@ export default function UpgradeRow({
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-[12px] font-bold leading-tight" style={color ? { color } : undefined}>{name}</div>
-        <div className="mt-0.5 text-[11px] leading-[1.15] text-white/70">{sub}</div>
+        <div className="mt-0.5 text-[12px] leading-snug text-white/75">{sub}</div>
         {!locked && disabled && plasma && (
           <UnlockBar cost={price} color={color ?? "#b7b2ff"} plasma={plasma} label={name} />
         )}

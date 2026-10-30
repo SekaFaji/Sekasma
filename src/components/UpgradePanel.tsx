@@ -58,7 +58,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                       role="tab"
                       aria-controls={`upgrade-panel-${id}`}
                       aria-selected={upTab === id}
-                      className={`min-h-[40px] border-r border-white/10 py-1 text-[11px] tracking-widest active:translate-y-[1px] ${
+                      className={`min-h-[44px] border-r border-white/10 py-1 text-[11px] tracking-widest active:translate-y-[1px] ${
                         upTab === id ? "bg-[#21153f] text-white" : "text-white/65"
                       }`}
                       style={upTab === id ? { borderBottom: `2px solid ${accent}` } : { borderBottom: "2px solid transparent" }}
@@ -74,14 +74,14 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                 {/* buy quantity selector */}
                 {upTab !== "gas" && (
                   <div className="mt-1 flex items-center gap-1">
-                    <span className="shrink-0 text-[10px] tracking-widest text-white/40">BUY</span>
+                    <span className="shrink-0 text-[11px] tracking-widest text-white/70">BUY</span>
                     {([1, 5, 10, 100, "max"] as (number | "max")[]).map((q) => (
                       <button
                         key={String(q)}
                         type="button"
                         aria-pressed={qty === q}
                         onClick={() => onQtyChange(q)}
-                        className={`min-h-[40px] flex-1 border py-1 text-[11px] tabular-nums active:translate-y-[1px] ${
+                        className={`min-h-[44px] flex-1 border py-1 text-[11px] tabular-nums active:translate-y-[1px] ${
                           qty === q ? "border-white/60 bg-[#21153f] text-white" : "border-white/20 text-white/75"
                         }`}
                       >
