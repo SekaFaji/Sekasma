@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { accrueIdle, bulkCost, cappedOfflineSeconds, fingerCost, purchaseUpgrade } from "../src/game/economy.ts";
 import { OFFLINE_CAP_S } from "../src/game/config.ts";
 import { freshSave, migrateSave } from "../src/game/save.ts";
+import { visibleHelperCount } from "../src/render/limits.ts";
 
 test("offline settlement is capped and handles negative time", () => {
   assert.equal(cappedOfflineSeconds(0, 86400000), OFFLINE_CAP_S);
@@ -79,4 +80,14 @@ test("v6 saves still migrate to a safe game state", () => {
   assert.equal(state.total.neon, 40);
   assert.equal(state.fingers, 1);
   assert.equal(state.activeSeconds, 0);
+});
+
+test("visual helper caps never limit economy ownership or income", () => {
+  const s = { ...freshSave(), fingers: 5000, toes: 100, ghosts: 30, unlocked: ["neon", "argon", "xenon"] };
+  const earned = accrueIdle(s, 10).gain.neon;
+  assert.ok(earned > accrueIdle({ ...s, fingers: 20, toes: 12, ghosts: 10 }, 10).gain.neon);
+  assert.equal(visibleHelperCount(s.fingers, "fingers"), 20);
+  assert.equal(visibleHelperCount(s.toes, "toes"), 12);
+  assert.equal(visibleHelperCount(s.ghosts, "ghosts"), 10);
+  assert.equal(visibleHelperCount(-10, "fingers"), 0);
 });

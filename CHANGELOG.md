@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.2 — Scalable visual helpers
+
+- Cap simultaneously rendered fingers, feet, and ghost hands without capping owned counts or earnings
+- Bound visual flash and ripple buffers so large helper populations remain predictable
+- Add a helper-visibility regression test to enforce the separation from game economy
+
 ## 0.12.1 — Reliable progression
 
 - Bound offline settlement on reload and browser resume; prevent StrictMode double-awards

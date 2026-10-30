@@ -19,6 +19,7 @@ import {
   drawPixelText,
 } from "../render/sprites";
 import { drawPlasmaArc, pixelCircle } from "../render/plasma";
+import { visibleHelperCount } from "../render/limits";
 import type { Ripple, FloatText, Flash, HoldArc, Wanderer } from "../render/plasma";
 import type { Gas, GasRecord } from "../game/types";
 
@@ -249,6 +250,9 @@ export default function PlasmaBall({
       last = now;
 
       const { filaments: fil, fingers: fing, toes: toe, unlocked: u, crackles: crk } = propsRef.current;
+      const visibleFingers = visibleHelperCount(fing, "fingers");
+      const visibleToes = visibleHelperCount(toe, "toes");
+      const visibleGhosts = visibleHelperCount(propsRef.current.ghosts, "ghosts");
       const sig = u.map((g) => g.id).join(",");
       if (cache.sig !== sig) buildBg(sig);
 
@@ -259,6 +263,7 @@ export default function PlasmaBall({
       const held = pts.length > 0;
       const activeFlash = flashes.current.length > 0;
 
+      // Rendering is deliberately capped: simulation earnings still use the full owned count.
       // ---- one pass over all helpers (front or back) ----
       const runHelpers = (
         seeds: { current: Wanderer[] }, count: number, orients: string[][],
@@ -292,8 +297,8 @@ export default function PlasmaBall({
       ctx.drawImage(far, 0, 0);
 
       // helpers pressing from BEHIND the glass: silhouettes, mostly hidden
-      runHelpers(fingerSeeds, fing, FINGER_ORIENTS, false, true);
-      runHelpers(toeSeeds, toe, FOOT_ORIENTS, true, true);
+      runHelpers(fingerSeeds, visibleFingers, FINGER_ORIENTS, false, true);
+      runHelpers(toeSeeds, visibleToes, FOOT_ORIENTS, true, true);
 
       // the glass
       ctx.drawImage(held || activeFlash ? cache.lit : cache.dead, 0, 0);
@@ -324,7 +329,7 @@ export default function PlasmaBall({
 
       // ---- ghost hands press from INSIDE the glass ----
       let ghostHold: { ang: number } | null = null;
-      const gho = propsRef.current.ghosts;
+      const gho = visibleGhosts;
       while (ghostOffs.length < gho) ghostOffs.push(Math.random() * GHOST_T);
       if (ghostOffs.length > gho) ghostOffs.length = gho;
       for (let gi = 0; gi < gho; gi++) {
@@ -465,6 +470,10 @@ export default function PlasmaBall({
         holdNext = Infinity;
       }
 
+      // Prevent visual effect arrays from growing without bound under automation.
+      if (flashes.current.length > 96) flashes.current.splice(0, flashes.current.length - 96);
+      if (ripples.current.length > 96) ripples.current.splice(0, ripples.current.length - 96);
+
       // ---- electrode ----
       const primary = u[u.length - 1];
       const pulse = 0.75 + Math.sin(t * 2) * 0.25;
@@ -479,8 +488,8 @@ export default function PlasmaBall({
       ctx.globalAlpha = 1;
 
       // helpers on THIS side of the glass: full color
-      runHelpers(fingerSeeds, fing, FINGER_ORIENTS, false, false);
-      runHelpers(toeSeeds, toe, FOOT_ORIENTS, true, false);
+      runHelpers(fingerSeeds, visibleFingers, FINGER_ORIENTS, false, false);
+      runHelpers(toeSeeds, visibleToes, FOOT_ORIENTS, true, false);
 
       // ---- your fingers on the glass (one sprite per touch) ----
       for (const [, p] of pts)
