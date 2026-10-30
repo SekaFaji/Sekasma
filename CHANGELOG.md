@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.10 - Responsive mobile layout and readability
+
+- Size the square plasma canvas from the actual available display area using CSS container units with viewport fallbacks
+- Give currency balances a narrow-screen-friendly, wrapping layout without cropping numbers
+- Increase upgrade-description readability and preserve compact price chips
+- Adjust the lower panel's height on short screens and ensure upgrade tab/quantity controls have 44px touch targets
+- Reset scroll position on section/category changes so switching from a long list never opens a short list at the bottom
+- Extend rendered React UI regression tests; game logic, saves, art and progression are unchanged
+
+
 ## 0.12.9 — Interaction clarity and accessibility
 
 - Keep existing purchase feedback over the panel viewport instead of inserting it into scrolling content

@@ -4,6 +4,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import PlasmaBall from "./components/PlasmaBall";
+import CurrencyHeader from "./components/CurrencyHeader";
 import UpgradePanel, { type UpTab } from "./components/UpgradePanel";
 import StatsPanel from "./components/StatsPanel";
 import OptionsPanel from "./components/OptionsPanel";
@@ -29,6 +30,7 @@ export default function App() {
   const [buzz, setBuzz] = useState(() => loadOpts().buzz);
   const [toast, setToast] = useState<string | null>(null);
   const toastT = useRef<number | undefined>(undefined);
+  const panelScrollRef = useRef<HTMLDivElement | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const stateRef = useRef(state);
   const restored = useRef(false);
@@ -138,6 +140,18 @@ export default function App() {
     }
   };
 
+  // Reset list position when changing sections; otherwise a short tab can open
+  // at the previous tab's deep scroll offset on small Android screens.
+  const switchMainTab = (next: Tab) => {
+    setTab(next);
+    setConfirmReset(false);
+    if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
+  };
+  const switchUpgradeTab = (next: UpTab) => {
+    setUpTab(next);
+    if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
+  };
+
   const playSec = Math.floor(state.activeSeconds);
 
   return (
@@ -153,34 +167,7 @@ export default function App() {
           />
         )}
 
-        {/* status bar + currency chips */}
-        <header className="border-b-2 border-white/15 bg-[#120a2e] px-3 py-2">
-          <div className="flex items-baseline justify-between">
-            <span className="text-[10px] tracking-widest text-white/50">PLASMA BALL</span>
-            <span className="text-[10px] tracking-widest text-white/50">
-              {state.fingers} FING · {state.toes} FEET · {state.ghosts} GHO
-            </span>
-          </div>
-          <div className="mt-1 flex gap-1">
-            {unlockedGases.map((g) => (
-              <div
-                key={g.id}
-                className="min-w-0 flex-1 border px-1.5 py-1"
-                style={{ borderColor: `${g.color}44`, background: "#0d0820" }}
-              >
-                <div className="flex items-baseline justify-between gap-1">
-                  <span className="text-[10px] tracking-widest" style={{ color: g.color }}>{g.name}</span>
-                  <span className="text-[13px] font-bold leading-none tabular-nums" style={{ color: g.color }}>
-                    {fmt(state.plasma[g.id])}
-                  </span>
-                </div>
-                <div className="mt-0.5 text-[10px] tabular-nums text-white/40">
-                  {fmt(cracklePower(g, state))}/TAP · {fmt(rates[g.id])}/S
-                </div>
-              </div>
-            ))}
-          </div>
-        </header>
+        <CurrencyHeader state={state} gases={unlockedGases} rates={rates} />
 
         {saveWarning && (
           <div role="alert" className="border-b border-[#ffb86b]/40 bg-[#35200c] px-3 py-2 text-[11px] text-[#ffd8a4]">
@@ -202,7 +189,7 @@ export default function App() {
         )}
 
         {/* the ball */}
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4">
+        <div className="sekasma-ball-area flex min-h-0 flex-1 flex-col items-center justify-center px-3">
           <PlasmaBall
             filaments={state.filaments}
             splits={state.splits}
@@ -226,7 +213,7 @@ export default function App() {
           ] as [Tab, string][]).map(([id, label]) => (
             <button
               key={id}
-              onClick={() => { setTab(id); setConfirmReset(false); }}
+              onClick={() => switchMainTab(id)}
               aria-current={tab === id ? "page" : undefined}
               className={`min-h-[44px] py-2 text-[11px] tracking-widest active:translate-y-[1px] ${
                 tab === id ? "bg-[#1b1233] text-white" : "text-white/70"
@@ -239,11 +226,11 @@ export default function App() {
         </nav>
 
         {/* Keep feedback anchored to the panel viewport, never inside scroll content. */}
-        <div className="relative h-[min(43dvh,480px)] min-h-0 shrink-0">
-          <div className="sekasma-scroll h-full overflow-y-auto overscroll-contain bg-[#0d0820] p-2">
+        <div className="sekasma-panel-shell relative min-h-0 shrink-0">
+          <div ref={panelScrollRef} className="sekasma-scroll h-full overflow-y-auto overscroll-contain bg-[#0d0820] p-2">
           {tab === "upgrades" && (
             <UpgradePanel state={state} unlockedGases={unlockedGases} accent={accent}
-              upTab={upTab} onUpTabChange={setUpTab} qty={qty}
+              upTab={upTab} onUpTabChange={switchUpgradeTab} qty={qty}
               onQtyChange={setQty} onBuy={buy} />
           )}
 

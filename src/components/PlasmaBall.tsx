@@ -568,10 +568,11 @@ export default function PlasmaBall({
   return (
     <canvas
       ref={canvasRef}
+      className="sekasma-ball-canvas"
       width={PX}
       height={PX}
       style={{
-        width: "min(100%, 36dvh, 300px)", maxWidth: 300, height: "auto", display: "block",
+        height: "auto", display: "block",
         imageRendering: "pixelated", touchAction: "none",
       }}
       role="button"
