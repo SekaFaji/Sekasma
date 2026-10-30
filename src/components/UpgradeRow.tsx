@@ -38,8 +38,8 @@ export default function UpgradeRow({
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] font-bold leading-none" style={color ? { color } : undefined}>{name}</div>
-        <div className="mt-0.5 truncate text-[8px] leading-tight text-white/45">{sub}</div>
+        <div className="text-[12px] font-bold leading-none" style={color ? { color } : undefined}>{name}</div>
+        <div className="mt-0.5 truncate text-[10px] leading-tight text-white/45">{sub}</div>
       </div>
       <CostChips cost={disabled && nextCost ? nextCost : cost} ok={!disabled} />
     </button>

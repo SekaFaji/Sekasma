@@ -19,6 +19,7 @@ import {
   drawPixelText,
 } from "../render/sprites";
 import { drawPlasmaArc, pixelCircle } from "../render/plasma";
+import { visibleHelperCount } from "../render/limits";
 import type { Ripple, FloatText, Flash, HoldArc, Wanderer } from "../render/plasma";
 import type { Gas, GasRecord } from "../game/types";
 
@@ -244,11 +245,17 @@ export default function PlasmaBall({
           };
 
     const draw = (now: number) => {
+      // The browser may deliver a stale frame while transitioning to background.
+      // Never draw or advance held-touch effects while the page is hidden.
+      if (document.hidden) return;
       const t = (now - start) / 1000;
-      const dt = Math.min((now - last) / 1000, 0.1);
+      const dt = Math.max(0, Math.min((now - last) / 1000, 0.1));
       last = now;
 
       const { filaments: fil, fingers: fing, toes: toe, unlocked: u, crackles: crk } = propsRef.current;
+      const visibleFingers = visibleHelperCount(fing, "fingers");
+      const visibleToes = visibleHelperCount(toe, "toes");
+      const visibleGhosts = visibleHelperCount(propsRef.current.ghosts, "ghosts");
       const sig = u.map((g) => g.id).join(",");
       if (cache.sig !== sig) buildBg(sig);
 
@@ -259,6 +266,7 @@ export default function PlasmaBall({
       const held = pts.length > 0;
       const activeFlash = flashes.current.length > 0;
 
+      // Rendering is deliberately capped: simulation earnings still use the full owned count.
       // ---- one pass over all helpers (front or back) ----
       const runHelpers = (
         seeds: { current: Wanderer[] }, count: number, orients: string[][],
@@ -292,8 +300,8 @@ export default function PlasmaBall({
       ctx.drawImage(far, 0, 0);
 
       // helpers pressing from BEHIND the glass: silhouettes, mostly hidden
-      runHelpers(fingerSeeds, fing, FINGER_ORIENTS, false, true);
-      runHelpers(toeSeeds, toe, FOOT_ORIENTS, true, true);
+      runHelpers(fingerSeeds, visibleFingers, FINGER_ORIENTS, false, true);
+      runHelpers(toeSeeds, visibleToes, FOOT_ORIENTS, true, true);
 
       // the glass
       ctx.drawImage(held || activeFlash ? cache.lit : cache.dead, 0, 0);
@@ -324,7 +332,7 @@ export default function PlasmaBall({
 
       // ---- ghost hands press from INSIDE the glass ----
       let ghostHold: { ang: number } | null = null;
-      const gho = propsRef.current.ghosts;
+      const gho = visibleGhosts;
       while (ghostOffs.length < gho) ghostOffs.push(Math.random() * GHOST_T);
       if (ghostOffs.length > gho) ghostOffs.length = gho;
       for (let gi = 0; gi < gho; gi++) {
@@ -465,6 +473,10 @@ export default function PlasmaBall({
         holdNext = Infinity;
       }
 
+      // Prevent visual effect arrays from growing without bound under automation.
+      if (flashes.current.length > 96) flashes.current.splice(0, flashes.current.length - 96);
+      if (ripples.current.length > 96) ripples.current.splice(0, ripples.current.length - 96);
+
       // ---- electrode ----
       const primary = u[u.length - 1];
       const pulse = 0.75 + Math.sin(t * 2) * 0.25;
@@ -479,8 +491,8 @@ export default function PlasmaBall({
       ctx.globalAlpha = 1;
 
       // helpers on THIS side of the glass: full color
-      runHelpers(fingerSeeds, fing, FINGER_ORIENTS, false, false);
-      runHelpers(toeSeeds, toe, FOOT_ORIENTS, true, false);
+      runHelpers(fingerSeeds, visibleFingers, FINGER_ORIENTS, false, false);
+      runHelpers(toeSeeds, visibleToes, FOOT_ORIENTS, true, false);
 
       // ---- your fingers on the glass (one sprite per touch) ----
       for (const [, p] of pts)
@@ -512,18 +524,37 @@ export default function PlasmaBall({
 
       raf = requestAnimationFrame(draw);
     };
-    raf = requestAnimationFrame(draw);
-    // safety net: never leave a stuck pointer holding the glass
+    // Never retain a held finger across a tab switch, app suspension, or focus loss.
+    const clearPointers = () => {
+      pointers.current.clear();
+      holdArcs.current.length = 0;
+      holdNext = Infinity;
+    };
     const rmPointer = (ev: PointerEvent) => pointers.current.delete(ev.pointerId);
-    const clearPointers = () => pointers.current.clear();
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        clearPointers();
+        cancelAnimationFrame(raf);
+      } else {
+        // Do not simulate background time as a giant animation frame.
+        last = performance.now();
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(draw);
+      }
+    };
+
+    if (!document.hidden) raf = requestAnimationFrame(draw);
     window.addEventListener("pointerup", rmPointer);
     window.addEventListener("pointercancel", rmPointer);
     window.addEventListener("blur", clearPointers);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       cancelAnimationFrame(raf);
+      clearPointers();
       window.removeEventListener("pointerup", rmPointer);
       window.removeEventListener("pointercancel", rmPointer);
       window.removeEventListener("blur", clearPointers);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -542,6 +573,17 @@ export default function PlasmaBall({
       style={{
         width: "100%", maxWidth: 300, height: "auto", display: "block",
         imageRendering: "pixelated", touchAction: "none",
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label="Plasma ball. Press Enter or Space to generate electricity."
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && !e.repeat) {
+          e.preventDefault();
+          crackleRef.current(1);
+          texts.current.push({ x: CX, y: CY - 10, age: 0, str: `+${fmtShort(neonPowRef.current)}` });
+          ripples.current.push({ x: CX, y: CY, age: 0, color: "#ffffff" });
+        }
       }}
       onPointerDown={(e) => {
         // max 2 player touches — a third finger is ignored
@@ -562,6 +604,7 @@ export default function PlasmaBall({
       }}
       onPointerUp={(e) => pointers.current.delete(e.pointerId)}
       onPointerCancel={(e) => pointers.current.delete(e.pointerId)}
+      onLostPointerCapture={(e) => pointers.current.delete(e.pointerId)}
     />
   );
 }

@@ -3,7 +3,6 @@
  * effect types (ripples, flashes, hold arcs, wanderers) that the
  * render loop animates.
  */
-import { CX, CY, R } from "./geometry";
 import type { Gas } from "../game/types";
 
 // ---------- The plasma arc ----------

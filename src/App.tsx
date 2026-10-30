@@ -7,12 +7,15 @@ import PlasmaBall from "./components/PlasmaBall";
 import PixelIcon from "./components/PixelIcon";
 import UpgradeRow from "./components/UpgradeRow";
 import InfoRow from "./components/InfoRow";
+import StatsPanel from "./components/StatsPanel";
+import OptionsPanel from "./components/OptionsPanel";
 import UnlockBar from "./components/UnlockBar";
 import { GAS_LIST, gasById, nextGas } from "./game/gases";
-import { OFFLINE_CAP_S, SPLIT_CAP, fmtVolts, splitMult, voltMult } from "./game/config";
-import { bulkCost, buyMsg, canAfford, cracklePower, idleRate, pay, peekCost } from "./game/economy";
+import { SPLIT_CAP, fmtVolts, splitMult, voltMult } from "./game/config";
+import { accrueIdle, bulkCost, buyMsg, canAfford, cappedOfflineSeconds, cracklePower, idleRate, peekCost, purchaseUpgrade } from "./game/economy";
 import type { BuyKind } from "./game/economy";
-import { freshSave, loadOpts, loadSave, persist, saveOpts } from "./game/save";
+import { freshSave, loadOpts, loadSave, persist, resetSave, saveOpts } from "./game/save";
+import { measureTick } from "./game/timing";
 import { fmt } from "./utils/format";
 import { haptic } from "./utils/haptic";
 import {
@@ -33,6 +36,7 @@ type UpTab = "help" | "gas" | "power";
 export default function App() {
   const [state, setState] = useState<GameState>(() => loadSave() ?? freshSave());
   const [offlineGain, setOfflineGain] = useState<Partial<GasRecord> | null>(null);
+  const [saveWarning, setSaveWarning] = useState(false);
   const [tab, setTab] = useState<Tab>("upgrades");
   const [upTab, setUpTab] = useState<UpTab>("help");
   const [qty, setQty] = useState<number | "max">(1);
@@ -42,61 +46,63 @@ export default function App() {
   const toastT = useRef<number | undefined>(undefined);
   const [confirmReset, setConfirmReset] = useState(false);
   const stateRef = useRef(state);
+  const restored = useRef(false);
   stateRef.current = state;
 
+  // Credit existing offline rewards once, including under React StrictMode.
   useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
     const saved = loadSave();
     if (!saved) return;
-    const elapsed = Math.min((Date.now() - saved.lastSeen) / 1000, OFFLINE_CAP_S);
-    const rates = idleRate(saved);
-    const gain: Partial<GasRecord> = {};
-    let any = false;
-    for (const g of GAS_LIST) {
-      const v = rates[g.id] * elapsed;
-      if (v > 1) {
-        gain[g.id] = v;
-        any = true;
-      }
-    }
-    if (elapsed > 60 && any) {
-      setState((s) => {
-        const plasma = { ...s.plasma };
-        const total = { ...s.total };
-        for (const [g, v] of Object.entries(gain) as [GasId, number][]) {
-          plasma[g] += v;
-          total[g] += v;
-        }
-        return { ...s, plasma, total };
-      });
-      setOfflineGain(gain);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const seconds = cappedOfflineSeconds(saved.lastSeen, Date.now());
+    const { gain } = accrueIdle(saved, seconds);
+    if (seconds > 0) setState((current) => accrueIdle(current, seconds).state);
+    if (seconds > 60 && GAS_LIST.some((g) => gain[g.id] > 1)) setOfflineGain(gain);
   }, []);
 
-  // idle income = hired fingers & feet pressing around the clock
+  // Hidden tabs do not run the realtime tick. On resume settle one capped absence.
   useEffect(() => {
     let last = Date.now();
-    const iv = setInterval(() => {
+    let hiddenAt: number | null = document.hidden ? last : null;
+    const onVisibility = () => {
       const now = Date.now();
-      const dt = (now - last) / 1000;
+      if (document.hidden) {
+        hiddenAt = now;
+        persist(stateRef.current);
+      } else {
+        const seconds = hiddenAt === null ? 0 : cappedOfflineSeconds(hiddenAt, now);
+        if (seconds > 0) setState((s) => accrueIdle(s, seconds).state);
+        hiddenAt = null;
+        last = now;
+      }
+    };
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      if (document.hidden) { last = now; return; }
+      const { incomeSeconds, activeSeconds } = measureTick(last, now);
       last = now;
+      if (incomeSeconds <= 0) return;
       setState((s) => {
-        const rates = idleRate(s);
-        if (rates.neon + rates.argon + rates.xenon <= 0) return s;
-        const plasma = { ...s.plasma };
-        const total = { ...s.total };
-        for (const g of s.unlocked) {
-          plasma[g] += rates[g] * dt;
-          total[g] += rates[g] * dt;
-        }
-        return { ...s, plasma, total };
+        const credited = accrueIdle(s, incomeSeconds).state;
+        return activeSeconds > 0
+          ? { ...credited, activeSeconds: s.activeSeconds + activeSeconds }
+          : credited;
       });
-    }, 200);
-    const saveIv = setInterval(() => persist(stateRef.current), 2000);
+    }, 1000);
+    const autosave = window.setInterval(() => {
+      if (!document.hidden) setSaveWarning(!persist(stateRef.current));
+    }, 2000);
+    // If already hidden, retain the timestamp saved at the moment of hiding.
+    // Re-saving on pagehide could erase hours of pending offline earnings.
+    const onPageHide = () => { if (!document.hidden) persist(stateRef.current); };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
     return () => {
-      clearInterval(iv);
-      clearInterval(saveIv);
-      persist(stateRef.current);
+      clearInterval(timer);
+      clearInterval(autosave);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
     };
   }, []);
 
@@ -136,27 +142,7 @@ export default function App() {
   const buy = (kind: BuyKind, gid?: GasId) => {
     const want = kind === "gas" ? 1 : qty === "max" ? 1000 : qty;
     const pre = bulkCost(stateRef.current, kind, gid, want);
-    setState((s) => {
-      const { cost, count } = bulkCost(s, kind, gid, want);
-      if (count <= 0) return s;
-      const next: GameState = { ...s, plasma: { ...s.plasma } };
-      pay(next, cost);
-      if (kind === "finger") next.fingers = s.fingers + count;
-      if (kind === "toe") next.toes = s.toes + count;
-      if (kind === "ghost") next.ghosts = s.ghosts + count;
-      if (kind === "filament" && gid)
-        next.filaments = { ...s.filaments, [gid]: s.filaments[gid] + count };
-      if (kind === "voltage" && gid)
-        next.voltage = { ...s.voltage, [gid]: s.voltage[gid] + count };
-      if (kind === "split" && gid)
-        next.splits = { ...s.splits, [gid]: s.splits[gid] + count };
-      if (kind === "gas") {
-        const nx = nextGas(s.unlocked);
-        if (!nx) return s;
-        next.unlocked = [...s.unlocked, nx.id];
-      }
-      return next;
-    });
+    setState((s) => purchaseUpgrade(s, kind, gid, want).state);
     if (pre.count > 0) {
       buzzNow(12);
       showToast(
@@ -185,7 +171,7 @@ export default function App() {
     power: unlockedGases.some((g) => powerKinds.some((k) => bulkCost(state, k, g.id, 1).count > 0)),
   };
 
-  const playSec = Math.floor((Date.now() - state.created) / 1000);
+  const playSec = Math.floor(state.activeSeconds);
 
   return (
     <div className="flex min-h-screen justify-center bg-[#05030f] font-mono text-white select-none">
@@ -203,8 +189,8 @@ export default function App() {
         {/* status bar + currency chips */}
         <header className="border-b-2 border-white/15 bg-[#120a2e] px-3 py-2">
           <div className="flex items-baseline justify-between">
-            <span className="text-[9px] tracking-widest text-white/50">PLASMA BALL</span>
-            <span className="text-[9px] tracking-widest text-white/50">
+            <span className="text-[10px] tracking-widest text-white/50">PLASMA BALL</span>
+            <span className="text-[10px] tracking-widest text-white/50">
               {state.fingers} FING · {state.toes} FEET · {state.ghosts} GHO
             </span>
           </div>
@@ -216,12 +202,12 @@ export default function App() {
                 style={{ borderColor: `${g.color}44`, background: "#0d0820" }}
               >
                 <div className="flex items-baseline justify-between gap-1">
-                  <span className="text-[8px] tracking-widest" style={{ color: g.color }}>{g.name}</span>
+                  <span className="text-[10px] tracking-widest" style={{ color: g.color }}>{g.name}</span>
                   <span className="text-[13px] font-bold leading-none tabular-nums" style={{ color: g.color }}>
                     {fmt(state.plasma[g.id])}
                   </span>
                 </div>
-                <div className="mt-0.5 text-[8px] tabular-nums text-white/40">
+                <div className="mt-0.5 text-[10px] tabular-nums text-white/40">
                   {fmt(cracklePower(g, state))}/TAP · {fmt(rates[g.id])}/S
                 </div>
               </div>
@@ -229,16 +215,22 @@ export default function App() {
           </div>
         </header>
 
+        {saveWarning && (
+          <div role="alert" className="border-b border-[#ffb86b]/40 bg-[#35200c] px-3 py-2 text-[11px] text-[#ffd8a4]">
+            SAVE UNAVAILABLE — PROGRESS MAY BE LOST WHEN THIS TAB CLOSES.
+          </div>
+        )}
+
         {offlineGain !== null && (
           <button
-            className="border-b-2 border-white/15 bg-[#1b1233] px-3 py-2 text-[10px] active:bg-[#241840]"
+            className="border-b-2 border-white/15 bg-[#1b1233] px-3 py-2 text-[11px] active:bg-[#241840]"
             onClick={() => setOfflineGain(null)}
           >
             THE HELP KEPT PRESSING WHILE YOU WERE AWAY:{" "}
             {(Object.entries(offlineGain) as [GasId, number][])
               .map(([g, v]) => `${fmt(v)} ${gasById(g).name}`)
               .join(" · ")}{" "}
-            — TAP TO COLLECT
+            — TAP TO DISMISS
           </button>
         )}
 
@@ -268,7 +260,7 @@ export default function App() {
             <button
               key={id}
               onClick={() => setTab(id)}
-              className={`py-2 text-[10px] tracking-widest active:translate-y-[1px] ${
+              className={`min-h-[44px] py-2 text-[11px] tracking-widest active:translate-y-[1px] ${
                 tab === id ? "bg-[#1b1233] text-white" : "text-white/40"
               }`}
               style={tab === id ? { borderBottom: `3px solid ${accent}` } : { borderBottom: "3px solid transparent" }}
@@ -282,7 +274,7 @@ export default function App() {
         <div className="relative h-[42vh] shrink-0 overflow-y-auto bg-[#0d0820] p-2">
           {toast && (
             <div
-              className="pointer-events-none absolute inset-x-2 bottom-2 z-20 border-2 px-2 py-1.5 text-center text-[9px] tracking-widest"
+              className="pointer-events-none absolute inset-x-2 bottom-2 z-20 border-2 px-2 py-1.5 text-center text-[10px] tracking-widest"
               style={{ borderColor: accent, color: accent, background: "#1b1233" }}
             >
               {toast}
@@ -301,7 +293,7 @@ export default function App() {
                     <button
                       key={id}
                       onClick={() => setUpTab(id)}
-                      className={`py-1 text-[9px] tracking-widest active:translate-y-[1px] ${
+                      className={`py-1 text-[10px] tracking-widest active:translate-y-[1px] ${
                         upTab === id ? "bg-[#1b1233] text-white" : "text-white/40"
                       }`}
                       style={upTab === id ? { borderBottom: `2px solid ${accent}` } : { borderBottom: "2px solid transparent" }}
@@ -317,12 +309,12 @@ export default function App() {
                 {/* buy quantity selector */}
                 {upTab !== "gas" && (
                   <div className="mt-1 flex items-center gap-1">
-                    <span className="shrink-0 text-[8px] tracking-widest text-white/40">BUY</span>
+                    <span className="shrink-0 text-[10px] tracking-widest text-white/40">BUY</span>
                     {([1, 5, 10, 100, "max"] as (number | "max")[]).map((q) => (
                       <button
                         key={String(q)}
                         onClick={() => setQty(q)}
-                        className={`flex-1 border py-1 text-[9px] tabular-nums active:translate-y-[1px] ${
+                        className={`flex-1 border py-1 text-[10px] tabular-nums active:translate-y-[1px] ${
                           qty === q ? "border-white/60 bg-[#1b1233] text-white" : "border-white/15 text-white/40"
                         }`}
                       >
@@ -446,7 +438,7 @@ export default function App() {
                     const splitBuy = bulkCost(state, "split", g.id, bulkWant);
                     return (
                       <React.Fragment key={g.id}>
-                        <div className="mt-1 mb-0.5 px-0.5 text-[9px] font-bold tracking-widest" style={{ color: g.color }}>
+                        <div className="mt-1 mb-0.5 px-0.5 text-[10px] font-bold tracking-widest" style={{ color: g.color }}>
                           {g.name}
                         </div>
                         <UpgradeRow
@@ -491,86 +483,26 @@ export default function App() {
           )}
 
           {tab === "stats" && (
-            <div className="flex flex-col gap-1 text-[11px]">
-              {[
-                ["TOTAL CRACKLES", String(state.crackles)],
-                ["FINGERS HIRED", String(state.fingers)],
-                ["FEET HIRED", String(state.toes)],
-                ["GHOST HANDS", String(state.ghosts)],
-                ["TIME PLAYED", `${Math.floor(playSec / 3600)}H ${Math.floor((playSec % 3600) / 60)}M`],
-              ].map(([k, v]) => (
-                <div key={k} className="flex justify-between border-b border-white/10 px-1 py-1.5">
-                  <span className="text-white/50">{k}</span>
-                  <span className="tabular-nums">{v}</span>
-                </div>
-              ))}
-              {unlockedGases.map((g) => (
-                <React.Fragment key={g.id}>
-                  <div className="mt-1 px-1 text-[10px] font-bold" style={{ color: g.color }}>
-                    {g.name}
-                  </div>
-                  {[
-                    ["LIFETIME", fmt(state.total[g.id])],
-                    ["ARCS", `${state.filaments[g.id]}/${g.cap}`],
-                    ["SPLITS", `${state.splits[g.id]} BRANCHES · X${splitMult(state.splits[g.id]).toFixed(2)}`],
-                    ["VOLTS", fmtVolts(state.voltage[g.id])],
-                    ["VOLT STEPS", String(state.voltage[g.id])],
-                    ["POWER/TAP", fmt(cracklePower(g, state))],
-                    ["HELP RATE", fmt(rates[g.id]) + "/S"],
-                  ].map(([k, v]) => (
-                    <div key={k} className="flex justify-between border-b border-white/10 px-1 py-1.5">
-                      <span className="text-white/50">{k}</span>
-                      <span className="tabular-nums">{v}</span>
-                    </div>
-                  ))}
-                </React.Fragment>
-              ))}
-            </div>
+            <StatsPanel state={state} unlockedGases={unlockedGases} rates={rates} playSec={playSec} />
           )}
-
           {tab === "options" && (
-            <div className="flex flex-col gap-2 text-[11px]">
-              <button
-                onClick={() => setScanlines((v) => !v)}
-                className="flex items-center justify-between border-2 border-white/25 bg-[#1b1233] p-2 active:translate-y-[1px]"
-              >
-                <span>CRT SCANLINES</span>
-                <span style={{ color: scanlines ? "#61e06b" : "#ffffff40" }}>
-                  {scanlines ? "ON" : "OFF"}
-                </span>
-              </button>
-              <button
-                onClick={() => setBuzz((v) => !v)}
-                className="flex items-center justify-between border-2 border-white/25 bg-[#1b1233] p-2 active:translate-y-[1px]"
-              >
-                <span>HAPTIC BUZZ</span>
-                <span style={{ color: buzz ? "#61e06b" : "#ffffff40" }}>
-                  {buzz ? "ON" : "OFF"}
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  if (confirmReset) {
-                    setState(freshSave());
-                    setConfirmReset(false);
-                  } else setConfirmReset(true);
-                }}
-                className="border-2 p-2 active:translate-y-[1px]"
-                style={{
-                  borderColor: confirmReset ? "#ff5ec8" : "#ffffff40",
-                  color: confirmReset ? "#ff5ec8" : "#ffffff80",
-                  background: confirmReset ? "#2a1233" : "#120c26",
-                }}
-              >
-                {confirmReset ? "TAP AGAIN TO CONFIRM RESET" : "RESET SAVE"}
-              </button>
-              <p className="px-1 text-[9px] leading-relaxed text-white/30">
-                V11.1 · STEADY HANDS — MAX 2 PLAYER TOUCHES (NO MORE STUCK
-                FINGERS), FINGERS, TOES AND GHOST HANDS NOW FACE THE BALL
-                IN 8 DIRECTIONS, AND EVERY UPGRADE ALWAYS SHOWS ITS NEXT
-                PRICE, AFFORDABLE OR NOT.
-              </p>
-            </div>
+            <OptionsPanel
+              scanlines={scanlines}
+              buzz={buzz}
+              confirmReset={confirmReset}
+              onToggleScanlines={() => setScanlines((v) => !v)}
+              onToggleBuzz={() => setBuzz((v) => !v)}
+              onReset={() => {
+                if (confirmReset) {
+                  const fresh = resetSave();
+                  stateRef.current = fresh;
+                  setState(fresh);
+                  setOfflineGain(null);
+                  setToast(null);
+                  setConfirmReset(false);
+                } else setConfirmReset(true);
+              }}
+            />
           )}
         </div>
       </div>

@@ -7,20 +7,49 @@ on:
 
 jobs:
   verify:
-    name: Typecheck & build
+    name: Tests, typecheck & build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
+
+      # These pure TypeScript tests do not require an npm install.
+      - name: Unit tests
+        run: npm test
 
       - name: Install dependencies
-        run: npm install --no-fund --no-audit
+        run: npm ci --no-fund --no-audit
 
       - name: Typecheck
         run: npm run typecheck
 
       - name: Build
         run: npm run build
+
+      # Source-only ZIPs: a full checkout and drop-in files changed against main.
+      - name: Package source ZIPs
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          mkdir -p packages
+          git archive --format=zip --output=packages/Sekasma_FULL.zip HEAD
+          base="$(git merge-base "origin/${GITHUB_BASE_REF}" HEAD)"
+          mapfile -d '' -t changed < <(git diff --name-only --diff-filter=ACMR -z "$base" HEAD)
+          if (( ${#changed[@]} > 0 )); then
+            git archive --format=zip --output=packages/Sekasma_PATCH_ONLY.zip HEAD "${changed[@]}"
+          fi
+
+      - name: Upload source ZIPs
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sekasma-source-zips
+          path: packages/*.zip
+          if-no-files-found: error
+          retention-days: 30

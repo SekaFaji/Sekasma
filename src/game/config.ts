@@ -2,7 +2,7 @@
  * Tuning knobs: press cadence, helper multipliers, cost bases and the
  * micro-volt ladder. Balance changes happen here, and only here.
  */
-import type { GasRecord } from "./types";
+import type { GasRecord } from "./types.ts";
 
 // a "crackle" = one press on the glass
 export const PRESS_INTERVAL = 2.2; // hired help presses this often

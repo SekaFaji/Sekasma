@@ -1,7 +1,7 @@
 /**
  * The gases that fill the ball: data table plus lookup helpers.
  */
-import type { Gas, GasId } from "./types";
+import type { Gas, GasId } from "./types.ts";
 
 export const GAS_LIST: Gas[] = [
   { id: "neon", name: "NEON", color: "#ff5ec8", glow: "#b3238f", core: "#ffd6f2", baseRate: 0.1, cap: 12, unlockCost: {} },
