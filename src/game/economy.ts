@@ -2,7 +2,7 @@
  * The economy: cost curves per upgrade, bulk-buy pricing, income rates
  * and the state mutations behind every purchase.
  */
-import { GAS_LIST, gasById, nextGas } from "./gases";
+import { GAS_LIST, gasById, nextGas } from "./gases.ts";
 import {
   FIL_BASE,
   GHOST_MULT,
@@ -10,6 +10,7 @@ import {
   MAX_VOLT_STEPS,
   MIX_LV,
   PRESS_INTERVAL,
+  OFFLINE_CAP_S,
   SPLIT_BASE,
   SPLIT_CAP,
   TOE_MULT,
@@ -17,8 +18,8 @@ import {
   splitMult,
   voltMult,
   zero3,
-} from "./config";
-import type { Gas, GasId, GasRecord, GameState } from "./types";
+} from "./config.ts";
+import type { Gas, GasId, GasRecord, GameState } from "./types.ts";
 
 export const fingerCost = (n: number, unlocked: GasId[]): Partial<GasRecord> => {
   const c: Partial<GasRecord> = { neon: Math.ceil(5 * Math.pow(1.18, n)) };
@@ -134,4 +135,56 @@ export function buyMsg(kind: BuyKind, gid: GasId | undefined, n: number): string
   if (kind === "filament") return `+${n} ${gasById(gid!).name} ${s("ARC")}`;
   if (kind === "voltage") return `+${n} ${s("VOLT STEP")}`;
   return `+${n} ${s("BRANCH")}`;
+}
+
+/** Bound the duration of a single absence (including invalid system clocks). */
+export function cappedOfflineSeconds(fromMs: number, toMs: number): number {
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return 0;
+  return Math.min(OFFLINE_CAP_S, Math.max(0, (toMs - fromMs) / 1000));
+}
+
+/** Credit helper-generated income without mutating the original state. */
+export function accrueIdle(s: GameState, seconds: number): { state: GameState; gain: GasRecord } {
+  const dt = Number.isFinite(seconds) ? Math.min(OFFLINE_CAP_S, Math.max(0, seconds)) : 0;
+  const gain = zero3();
+  if (dt === 0) return { state: s, gain };
+  const rates = idleRate(s);
+  let any = false;
+  for (const gas of s.unlocked) {
+    gain[gas] = rates[gas] * dt;
+    if (gain[gas] > 0) any = true;
+  }
+  if (!any) return { state: s, gain };
+  const plasma = { ...s.plasma };
+  const total = { ...s.total };
+  for (const gas of s.unlocked) {
+    plasma[gas] += gain[gas];
+    total[gas] += gain[gas];
+  }
+  return { state: { ...s, plasma, total }, gain };
+}
+
+/** Atomic purchase used by the UI and tests. */
+export function purchaseUpgrade(
+  s: GameState, kind: BuyKind, gid: GasId | undefined, wanted: number,
+): { state: GameState; count: number } {
+  const { cost, count } = bulkCost(s, kind, gid, wanted);
+  if (count === 0) return { state: s, count: 0 };
+  const next: GameState = { ...s, plasma: { ...s.plasma } };
+  pay(next, cost);
+  if (kind === "finger") next.fingers = s.fingers + count;
+  if (kind === "toe") next.toes = s.toes + count;
+  if (kind === "ghost") next.ghosts = s.ghosts + count;
+  if (kind === "filament" && gid)
+    next.filaments = { ...s.filaments, [gid]: s.filaments[gid] + count };
+  if (kind === "voltage" && gid)
+    next.voltage = { ...s.voltage, [gid]: s.voltage[gid] + count };
+  if (kind === "split" && gid)
+    next.splits = { ...s.splits, [gid]: s.splits[gid] + count };
+  if (kind === "gas") {
+    const unlocked = nextGas(s.unlocked);
+    if (!unlocked) return { state: s, count: 0 };
+    next.unlocked = [...s.unlocked, unlocked.id];
+  }
+  return { state: next, count };
 }

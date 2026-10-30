@@ -2,9 +2,9 @@
  * Persistence: saving and loading against localStorage, migration
  * from every legacy save format, and player options.
  */
-import { GAS_LIST } from "./gases";
-import { MAX_VOLT_STEPS, VOLT_STEP, zero3 } from "./config";
-import type { GasId, GameState } from "./types";
+import { GAS_LIST } from "./gases.ts";
+import { MAX_VOLT_STEPS, SPLIT_CAP, VOLT_STEP, zero3 } from "./config.ts";
+import type { GasId, GameState } from "./types.ts";
 
 export const SAVE_KEY = "idle-plasma-ball-save-v10";
 export const LEGACY_V9_KEY = "idle-plasma-ball-save-v9";
@@ -31,7 +31,47 @@ export function freshSave(): GameState {
     plasma: zero3(), total: zero3(), crackles: 0,
     voltage: zero3(), fingers: 0, toes: 0, ghosts: 0,
     filaments: zero3(), splits: zero3(), unlocked: ["neon"],
-    created: now, lastSeen: now,
+    created: now, lastSeen: now, activeSeconds: 0,
+  };
+}
+
+
+/** Normalize untrusted persisted values before using them in the simulation. */
+function validNumber(value: unknown, fallback = 0, maximum = Number.MAX_SAFE_INTEGER): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.min(value, maximum) : fallback;
+}
+function sanitizeSave(s: GameState): GameState {
+  const fallback = freshSave();
+  const record = (value: unknown, max = Number.MAX_SAFE_INTEGER) => {
+    const object = value && typeof value === "object" && !Array.isArray(value)
+      ? value as Record<GasId, unknown> : {} as Record<GasId, unknown>;
+    const out = zero3();
+    for (const g of GAS_LIST) out[g.id] = validNumber(object[g.id], 0, max);
+    return out;
+  };
+  const rawUnlocks: unknown[] = Array.isArray(s.unlocked) ? s.unlocked : [];
+  const unlocked: GasId[] = ["neon"];
+  if (rawUnlocks.includes("argon")) unlocked.push("argon");
+  if (rawUnlocks.includes("argon") && rawUnlocks.includes("xenon")) unlocked.push("xenon");
+  const filaments = record(s.filaments);
+  const voltage = record(s.voltage, MAX_VOLT_STEPS);
+  const splits = record(s.splits, SPLIT_CAP);
+  for (const g of GAS_LIST) {
+    filaments[g.id] = Math.floor(Math.min(g.cap, filaments[g.id]));
+    voltage[g.id] = Math.floor(voltage[g.id]);
+    splits[g.id] = Math.floor(splits[g.id]);
+  }
+  return {
+    plasma: record(s.plasma), total: record(s.total),
+    crackles: Math.floor(validNumber(s.crackles)),
+    voltage, filaments, splits, unlocked,
+    fingers: Math.floor(validNumber(s.fingers)),
+    toes: Math.floor(validNumber(s.toes)),
+    ghosts: Math.floor(validNumber(s.ghosts)),
+    created: validNumber(s.created, fallback.created),
+    lastSeen: validNumber(s.lastSeen, fallback.lastSeen),
+    activeSeconds: validNumber(s.activeSeconds),
   };
 }
 
@@ -39,11 +79,11 @@ export function freshSave(): GameState {
 export function migrateSave(old: Record<string, unknown>): GameState {
   const base = freshSave();
   // v10 / v9 saves: load as-is (v9 predates splits)
-  if (old.v === 11 || old.v === 10 || old.v === 9) {
+  if (old.v === 12 || old.v === 11 || old.v === 10 || old.v === 9) {
     const s = { ...base, ...(old as unknown as GameState) };
     if (!s.splits) s.splits = zero3();
     if (typeof s.ghosts !== "number") s.ghosts = 0;
-    return s;
+    return sanitizeSave(s);
   }
   // v6 save: single currency, volts were x2 levels
   if (typeof old.plasma === "number") {
@@ -61,7 +101,7 @@ export function migrateSave(old: Record<string, unknown>): GameState {
       : gas === "argon" ? ["neon", "argon"]
       : ["neon"];
     base.created = (old.created as number) ?? Date.now();
-    return base;
+    return sanitizeSave(base);
   }
   // v8 save: gas currencies, volts were x2 levels → convert to steps
   const src = old as Record<string, Record<string, number> | number | GasId[] | undefined>;
@@ -82,7 +122,7 @@ export function migrateSave(old: Record<string, unknown>): GameState {
     const unl = src.unlocked as GasId[] | undefined;
     base.unlocked = Array.isArray(unl) && unl.length ? unl : ["neon"];
     base.created = (src.created as number) ?? Date.now();
-    return base;
+    return sanitizeSave(base);
   }
   return base;
 }
@@ -95,7 +135,9 @@ export function loadSave(): GameState | null {
       window.localStorage.getItem(LEGACY_V8_KEY) ??
       window.localStorage.getItem(LEGACY_V6_KEY);
     if (!raw) return null;
-    const s = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const s = parsed as Record<string, unknown>;
     if (typeof s.fingers !== "number") return null;
     return migrateSave(s);
   } catch {
@@ -104,7 +146,7 @@ export function loadSave(): GameState | null {
 }
 export function persist(s: GameState) {
   try {
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 11 }));
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 12 }));
   } catch {
     /* in-session only */
   }

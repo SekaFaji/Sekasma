@@ -10,7 +10,7 @@ import InfoRow from "./components/InfoRow";
 import UnlockBar from "./components/UnlockBar";
 import { GAS_LIST, gasById, nextGas } from "./game/gases";
 import { OFFLINE_CAP_S, SPLIT_CAP, fmtVolts, splitMult, voltMult } from "./game/config";
-import { bulkCost, buyMsg, canAfford, cracklePower, idleRate, pay, peekCost } from "./game/economy";
+import { accrueIdle, bulkCost, buyMsg, canAfford, cappedOfflineSeconds, cracklePower, idleRate, peekCost, purchaseUpgrade } from "./game/economy";
 import type { BuyKind } from "./game/economy";
 import { freshSave, loadOpts, loadSave, persist, saveOpts } from "./game/save";
 import { fmt } from "./utils/format";
@@ -42,61 +42,59 @@ export default function App() {
   const toastT = useRef<number | undefined>(undefined);
   const [confirmReset, setConfirmReset] = useState(false);
   const stateRef = useRef(state);
+  const restored = useRef(false);
   stateRef.current = state;
 
+  // Credit existing offline rewards once, including under React StrictMode.
   useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
     const saved = loadSave();
     if (!saved) return;
-    const elapsed = Math.min((Date.now() - saved.lastSeen) / 1000, OFFLINE_CAP_S);
-    const rates = idleRate(saved);
-    const gain: Partial<GasRecord> = {};
-    let any = false;
-    for (const g of GAS_LIST) {
-      const v = rates[g.id] * elapsed;
-      if (v > 1) {
-        gain[g.id] = v;
-        any = true;
-      }
-    }
-    if (elapsed > 60 && any) {
-      setState((s) => {
-        const plasma = { ...s.plasma };
-        const total = { ...s.total };
-        for (const [g, v] of Object.entries(gain) as [GasId, number][]) {
-          plasma[g] += v;
-          total[g] += v;
-        }
-        return { ...s, plasma, total };
-      });
-      setOfflineGain(gain);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const seconds = cappedOfflineSeconds(saved.lastSeen, Date.now());
+    const { gain } = accrueIdle(saved, seconds);
+    if (seconds > 0) setState((current) => accrueIdle(current, seconds).state);
+    if (seconds > 60 && GAS_LIST.some((g) => gain[g.id] > 1)) setOfflineGain(gain);
   }, []);
 
-  // idle income = hired fingers & feet pressing around the clock
+  // Hidden tabs do not run the realtime tick. On resume settle one capped absence.
   useEffect(() => {
     let last = Date.now();
-    const iv = setInterval(() => {
+    let hiddenAt: number | null = document.hidden ? last : null;
+    const onVisibility = () => {
       const now = Date.now();
-      const dt = (now - last) / 1000;
+      if (document.hidden) {
+        hiddenAt = now;
+        persist(stateRef.current);
+      } else {
+        const seconds = hiddenAt === null ? 0 : cappedOfflineSeconds(hiddenAt, now);
+        if (seconds > 0) setState((s) => accrueIdle(s, seconds).state);
+        hiddenAt = null;
+        last = now;
+      }
+    };
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      if (document.hidden) { last = now; return; }
+      const seconds = Math.max(0, Math.min((now - last) / 1000, 1.5));
       last = now;
+      if (seconds <= 0) return;
       setState((s) => {
-        const rates = idleRate(s);
-        if (rates.neon + rates.argon + rates.xenon <= 0) return s;
-        const plasma = { ...s.plasma };
-        const total = { ...s.total };
-        for (const g of s.unlocked) {
-          plasma[g] += rates[g] * dt;
-          total[g] += rates[g] * dt;
-        }
-        return { ...s, plasma, total };
+        const credited = accrueIdle(s, seconds).state;
+        return { ...credited, activeSeconds: s.activeSeconds + seconds };
       });
-    }, 200);
-    const saveIv = setInterval(() => persist(stateRef.current), 2000);
+    }, 1000);
+    const autosave = window.setInterval(() => {
+      if (!document.hidden) persist(stateRef.current);
+    }, 2000);
+    const onPageHide = () => persist(stateRef.current);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
     return () => {
-      clearInterval(iv);
-      clearInterval(saveIv);
-      persist(stateRef.current);
+      clearInterval(timer);
+      clearInterval(autosave);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
     };
   }, []);
 
@@ -136,27 +134,7 @@ export default function App() {
   const buy = (kind: BuyKind, gid?: GasId) => {
     const want = kind === "gas" ? 1 : qty === "max" ? 1000 : qty;
     const pre = bulkCost(stateRef.current, kind, gid, want);
-    setState((s) => {
-      const { cost, count } = bulkCost(s, kind, gid, want);
-      if (count <= 0) return s;
-      const next: GameState = { ...s, plasma: { ...s.plasma } };
-      pay(next, cost);
-      if (kind === "finger") next.fingers = s.fingers + count;
-      if (kind === "toe") next.toes = s.toes + count;
-      if (kind === "ghost") next.ghosts = s.ghosts + count;
-      if (kind === "filament" && gid)
-        next.filaments = { ...s.filaments, [gid]: s.filaments[gid] + count };
-      if (kind === "voltage" && gid)
-        next.voltage = { ...s.voltage, [gid]: s.voltage[gid] + count };
-      if (kind === "split" && gid)
-        next.splits = { ...s.splits, [gid]: s.splits[gid] + count };
-      if (kind === "gas") {
-        const nx = nextGas(s.unlocked);
-        if (!nx) return s;
-        next.unlocked = [...s.unlocked, nx.id];
-      }
-      return next;
-    });
+    setState((s) => purchaseUpgrade(s, kind, gid, want).state);
     if (pre.count > 0) {
       buzzNow(12);
       showToast(
@@ -185,7 +163,7 @@ export default function App() {
     power: unlockedGases.some((g) => powerKinds.some((k) => bulkCost(state, k, g.id, 1).count > 0)),
   };
 
-  const playSec = Math.floor((Date.now() - state.created) / 1000);
+  const playSec = Math.floor(state.activeSeconds);
 
   return (
     <div className="flex min-h-screen justify-center bg-[#05030f] font-mono text-white select-none">
@@ -238,7 +216,7 @@ export default function App() {
             {(Object.entries(offlineGain) as [GasId, number][])
               .map(([g, v]) => `${fmt(v)} ${gasById(g).name}`)
               .join(" · ")}{" "}
-            — TAP TO COLLECT
+            — TAP TO DISMISS
           </button>
         )}
 

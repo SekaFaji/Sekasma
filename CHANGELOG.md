@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.1 — Reliable progression
+
+- Bound offline settlement on reload and browser resume; prevent StrictMode double-awards
+- Record visible playtime rather than elapsed save age; credit idle only when helpers are owned
+- Validate legacy/corrupted saves, clamp values, and advance internal save schema to v12
+- Extract idle accrual and transactional purchases into pure testable functions
+- Add Node 22 regression tests for purchases, migration and offline progression
+
 All notable changes to this project are documented here.
 
 ## 0.12.0 — Project restructure
