@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.12.5 — Reproducible builds and static cleanup
+
+- Commit the genuine npm v10 lockfile generated on a GitHub-hosted Node 22 runner (185 packages)
+- Use `npm ci` and dependency caching in CI and GitHub Pages builds
+- Enable TypeScript's unused-local and unused-parameter checks; remove dead imports
+- Update installation guidance and document how to keep the dependency lock reproducible
+- Upload full-source and changed-files ZIP packages from pull-request CI runs
+
+
 ## 0.12.4 — Save recovery and lifecycle safety
 
 - Keep a backup of the previous save before overwriting the primary snapshot

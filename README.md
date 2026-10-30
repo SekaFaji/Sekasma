@@ -70,8 +70,10 @@ src/
 
 ## Getting started
 
+Node.js 22 or later is required.
+
 ```bash
-npm install
+npm ci
 npm run dev        # Vite dev server
 npm test           # Pure game logic regression tests (Node.js 22+)
 ```
@@ -88,12 +90,14 @@ npm test           # Pure game logic regression tests (Node.js 22+)
 
 Existing save keys are retained. The current primary snapshot and a previous-snapshot backup are read independently, and legacy formats remain supported. Reset clears both copies and legacy keys. Browser storage errors are surfaced to the player with a warning; the current session continues in memory even if saves cannot be written.
 
-The project currently pins direct dependency versions but has **no committed npm lockfile**. Until a lockfile is generated from the npm registry and committed, dependency trees are not reproducible. On a networked development machine, run `npm install --package-lock-only --ignore-scripts`, review and commit the resulting `package-lock.json`, then switch CI and Pages installs to `npm ci`.
+The repository contains an npm-generated `package-lock.json` (lockfile v3). Use **Node.js 22+** and `npm ci` to install exactly the locked dependency tree. CI and GitHub Pages both use `npm ci` so dependency resolution cannot drift between runs. If dependencies change intentionally, regenerate the lock with `npm install`, review the lockfile diff and commit both files together.
 
 ## Deployment
 
 Pushes to `main` are typechecked, tested and built by [CI](.github/workflows/ci.yml),
 then deployed to GitHub Pages by [deploy.yml](.github/workflows/deploy.yml), which also requires passing unit tests and typechecking before building.
+
+For pull requests, CI also uploads a **Sekasma-source-zips** artifact containing a full project ZIP and a PATCH_ONLY ZIP of files changed relative to the default branch. These are source archives, not compiled releases.
 
 ## License
 

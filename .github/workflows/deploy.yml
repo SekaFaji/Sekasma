@@ -23,9 +23,10 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
-        run: npm install --no-fund --no-audit
+        run: npm ci --no-fund --no-audit
 
       # A Pages deployment must pass the same quality gates as CI.
       - name: Unit tests

@@ -6,7 +6,6 @@ import { GAS_LIST, gasById, nextGas } from "./gases.ts";
 import {
   FIL_BASE,
   GHOST_MULT,
-  HOLD_INTERVAL,
   MAX_VOLT_STEPS,
   MIX_LV,
   PRESS_INTERVAL,
