@@ -1,35 +1,35 @@
-# Sekasma — Idle Plasma Ball
+# Sekasma - Idle Plasma Ball
 
 [![CI](https://github.com/SekaFaji/Sekasma/actions/workflows/ci.yml/badge.svg)](https://github.com/SekaFaji/Sekasma/actions/workflows/ci.yml)
 [![Deploy](https://github.com/SekaFaji/Sekasma/actions/workflows/deploy.yml/badge.svg)](https://github.com/SekaFaji/Sekasma/actions/workflows/deploy.yml)
 
 A pixel-art idle game about a plasma ball that only pays out while something is
 actually touching the glass. Built with React, TypeScript and a hand-rolled
-canvas sprite engine — no game framework, no asset files, every sprite is data.
+canvas sprite engine - no game framework, no asset files, every sprite is data.
 
-> The ball is dark. Press it and a neon string leaps to your fingertip — but
+> The ball is dark. Press it and a neon string leaps to your fingertip - but
 > nothing flows unless a finger, a hired hand, a whole foot or a ghost from
 > inside the electrode is pressing.
 
 ## Features
 
-- **True-touch economy** — no passive income floor: hired help presses on a
+- **True-touch economy** - no passive income floor: hired help presses on a
   cadence, you crackle while you hold, and everything else is still
-- **Multi-touch input** — up to two player fingers, each with its own plasma
+- **Multi-touch input** - up to two player fingers, each with its own plasma
   string that bends toward where you press
-- **Hired help with personality** — fingers, big toes and translucent ghost
+- **Hired help with personality** - fingers, big toes and translucent ghost
   hands circle the ball in 8 facings, pressing from both sides of the glass
-- **Three gas currencies** — NEON, ARGON and XENON, each with its own arcs,
+- **Three gas currencies** - NEON, ARGON and XENON, each with its own arcs,
   micro-volt ladder and string splits; high tiers cost mixed currencies
-- **Bulk buying** — ×1 / ×5 / ×10 / ×100 / MAX on every repeatable upgrade,
+- **Bulk buying** - ×1 / ×5 / ×10 / ×100 / MAX on every repeatable upgrade,
   with live bulk-count previews and always-visible next prices
-- **Hand-rolled pixel engine** — sprite models as string grids, baked 8-way
+- **Hand-rolled pixel engine** - sprite models as string grids, baked 8-way
   orientation sets (quarter turns plus nearest-neighbour 45° folds), a tiny
   3×5 pixel font and a 150px render surface upscaled with nearest-neighbour
   sampling
-- **Persistence done properly** — autosave with an independent backup, corrupted-save recovery, capped offline progress,
+- **Persistence done properly** - autosave with an independent backup, corrupted-save recovery, capped offline progress,
   migration from every legacy save format, and options stored separately
-- **Feel** — CRT scanlines, haptic buzz on purchases, monospace all-caps UI,
+- **Feel** - CRT scanlines, haptic buzz on purchases, monospace all-caps UI,
   phone-first 400px portrait layout
 
 ## Architecture
