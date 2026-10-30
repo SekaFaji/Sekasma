@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.9 — Interaction clarity and accessibility
+
+- Keep existing purchase feedback over the panel viewport instead of inserting it into scrolling content
+- Replace the ambiguous second-tap reset flow with explicit CANCEL and CONFIRM RESET actions
+- Dismiss pending reset confirmation when leaving the Options tab
+- Add pressed-state semantics to toggles and purchase quantity, and connect upgrade tabs to their panels
+- Expand rendered UI tests for confirmation states and accessible upgrade controls
+- No game balance, content, art or save-schema changes
+
+
 ## 0.12.8 — UI tests and maintainable components
 
 - Extract UpgradePanel from the application shell while retaining existing progression and controls

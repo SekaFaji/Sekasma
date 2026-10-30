@@ -52,8 +52,11 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                   ] as [UpTab, string][]).map(([id, label]) => (
                     <button
                       key={id}
+                      id={`upgrade-tab-${id}`}
+                      type="button"
                       onClick={() => onUpTabChange(id)}
                       role="tab"
+                      aria-controls={`upgrade-panel-${id}`}
                       aria-selected={upTab === id}
                       className={`min-h-[40px] border-r border-white/10 py-1 text-[11px] tracking-widest active:translate-y-[1px] ${
                         upTab === id ? "bg-[#21153f] text-white" : "text-white/65"
@@ -75,6 +78,8 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                     {([1, 5, 10, 100, "max"] as (number | "max")[]).map((q) => (
                       <button
                         key={String(q)}
+                        type="button"
+                        aria-pressed={qty === q}
                         onClick={() => onQtyChange(q)}
                         className={`min-h-[40px] flex-1 border py-1 text-[11px] tabular-nums active:translate-y-[1px] ${
                           qty === q ? "border-white/60 bg-[#21153f] text-white" : "border-white/20 text-white/75"
@@ -87,6 +92,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                 )}
               </div>
 
+              <div id={`upgrade-panel-${upTab}`} role="tabpanel" aria-labelledby={`upgrade-tab-${upTab}`}>
               {upTab === "help" && (
                 <>
                   <UpgradeRow
@@ -247,6 +253,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                   })}
                 </>
               )}
+              </div>
             </div>
   );
 }

@@ -96,6 +96,9 @@ The repository contains an npm-generated `package-lock.json` (lockfile v3). Use 
 
 ## Mobile browser smoke test
 
+For interaction polish, verify that purchase feedback does **not** shift the upgrade list, that Options → Reset offers separate Cancel/Confirm actions, and that switching away from Options dismisses an unfinished confirmation.
+
+
 Before merging a renderer change, check the following on an actual phone:
 
 1. Hold a finger on the plasma ball, switch apps, then return. The game must **not** treat the old finger as held or generate manual crackles until a fresh touch.
