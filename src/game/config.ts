@@ -26,5 +26,7 @@ export const voltValue = (steps: number) => steps * VOLT_STEP;
 export const voltMult = (steps: number) => 1 + voltValue(steps);
 export const fmtVolts = (steps: number) => voltValue(steps).toFixed(4) + "V";
 
+export const zero3 = (): GasRecord => ({ neon: 0, argon: 0, xenon: 0 });
+
 // past certain levels, hired help demands payment in EVERY currency
 export const MIX_LV = { argon: 12, xenon: 25 };

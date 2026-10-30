@@ -19,13 +19,12 @@ import {
   FINGER_SPRITE,
   FOOT_SPRITE,
   GHOST_SPRITE,
-  SKIN_PALETTE,
-  GHOST_PALETTE,
   GAS_ICON,
   FIL_ICON,
   VOLT_ICON,
   SPLIT_ICON,
 } from "./render/sprites";
+import { SKIN, SKIN_PALETTE, GHOST_PALETTE } from "./render/palette";
 import type { GasId, GasRecord, GameState } from "./game/types";
 
 type Tab = "upgrades" | "stats" | "options";
