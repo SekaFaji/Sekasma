@@ -12,7 +12,7 @@ export default function CostChips({ cost, ok }: { cost: Partial<GasRecord>; ok: 
       {(Object.entries(cost) as [GasId, number][]).map(([g, amt]) => (
         <span
           key={g}
-          className="border px-1 py-0.5 text-[9px] tabular-nums"
+          className="border px-1 py-0.5 text-[11px] tabular-nums"
           style={{
             borderColor: ok ? gasById(g).color : "#ffffff20",
             color: ok ? gasById(g).color : "#ffffff40",

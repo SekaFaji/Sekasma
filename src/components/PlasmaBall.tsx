@@ -552,6 +552,17 @@ export default function PlasmaBall({
         width: "100%", maxWidth: 300, height: "auto", display: "block",
         imageRendering: "pixelated", touchAction: "none",
       }}
+      role="button"
+      tabIndex={0}
+      aria-label="Plasma ball. Press Enter or Space to generate electricity."
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && !e.repeat) {
+          e.preventDefault();
+          crackleRef.current(1);
+          texts.current.push({ x: CX, y: CY - 10, age: 0, str: `+${fmtShort(neonPowRef.current)}` });
+          ripples.current.push({ x: CX, y: CY, age: 0, color: "#ffffff" });
+        }
+      }}
       onPointerDown={(e) => {
         // max 2 player touches — a third finger is ignored
         if (pointers.current.size >= 2 && !pointers.current.has(e.pointerId)) return;

@@ -69,18 +69,20 @@ src/
 ```bash
 npm install
 npm run dev        # Vite dev server
+npm test           # Pure game logic regression tests (Node.js 22+)
 ```
 
 | Script              | Purpose                          |
 | ------------------- | -------------------------------- |
 | `npm run dev`       | Dev server with hot reload       |
 | `npm run typecheck` | `tsc --noEmit` under strict mode |
+| `npm test`       | Node test runner for game economy and saves |
 | `npm run build`     | Production bundle to `dist/`     |
 | `npm run preview`   | Preview the production build     |
 
 ## Deployment
 
-Pushes to `main` are typechecked and built by [CI](.github/workflows/ci.yml),
+Pushes to `main` are typechecked, tested and built by [CI](.github/workflows/ci.yml),
 then deployed to GitHub Pages by [deploy.yml](.github/workflows/deploy.yml).
 
 ## License

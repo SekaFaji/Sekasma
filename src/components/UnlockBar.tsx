@@ -19,7 +19,7 @@ export default function UnlockBar({
       <div className="h-1.5 flex-1 border border-white/15 bg-[#0b0618]">
         <div className="h-full" style={{ width: `${shown}%`, background: color }} />
       </div>
-      <span className="shrink-0 text-[8px] tabular-nums text-white/40">{shown}%</span>
+      <span className="shrink-0 text-[10px] tabular-nums text-white/40">{shown}%</span>
     </div>
   );
 }

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.3 — Mobile polish and module cleanup
+
+- Extract statistics and options panels from the application shell
+- Increase compact text sizes, lighten muted text, and allow mobile browser zoom
+- Make the plasma canvas keyboard-accessible, with Enter/Space touch equivalents
+- Pin direct dependency versions, standardize Node 22 for CI and deployment
+- Improve documentation for the tests and rendering limits
+
+**Build note:** A lockfile still needs generating with npm on a networked machine and committing; exact top-level dependency pins alone cannot freeze transitive dependencies.
+
 ## 0.12.2 — Scalable visual helpers
 
 - Cap simultaneously rendered fingers, feet, and ghost hands without capping owned counts or earnings
