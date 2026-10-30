@@ -96,6 +96,9 @@ The repository contains an npm-generated `package-lock.json` (lockfile v3). Use 
 
 ## Mobile browser smoke test
 
+On short Android screens, confirm the ball remains square and touch positions follow the rendered ball (no stretching). Test both a short viewport and a narrow viewport with three gases, switch from a deeply scrolled POWER list to HELP or STATS, and verify the list begins at the top. Currency totals must wrap rather than overlap other cards. These checks require an actual browser; server-rendered UI tests cannot measure screen geometry.
+
+
 For interaction polish, verify that purchase feedback does **not** shift the upgrade list, that Options → Reset offers separate Cancel/Confirm actions, and that switching away from Options dismisses an unfinished confirmation.
 
 

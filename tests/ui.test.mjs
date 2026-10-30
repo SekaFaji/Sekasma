@@ -11,6 +11,7 @@ let UpgradeRow;
 let App;
 let OptionsPanel;
 let UpgradePanel;
+let CurrencyHeader;
 
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: "custom", logLevel: "error" });
@@ -18,6 +19,7 @@ before(async () => {
   ({ default: App } = await server.ssrLoadModule("/src/App.tsx"));
   ({ default: OptionsPanel } = await server.ssrLoadModule("/src/components/OptionsPanel.tsx"));
   ({ default: UpgradePanel } = await server.ssrLoadModule("/src/components/UpgradePanel.tsx"));
+  ({ default: CurrencyHeader } = await server.ssrLoadModule("/src/components/CurrencyHeader.tsx"));
 });
 after(async () => { if (server) await server.close(); });
 
@@ -100,4 +102,36 @@ test("upgrade tabs and quantity selectors expose their selected states", async (
   assert.match(html, /aria-selected="true"/);
   assert.match(html, /aria-pressed="true"/);
   assert.match(html, /aria-controls="upgrade-panel-help"/);
+});
+
+test("currency header keeps gas totals in distinct, wrapping cards", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { GAS_LIST } = await import("../src/game/gases.ts");
+  const state = { ...freshSave(), unlocked: ["neon", "argon", "xenon"] };
+  const html = renderToStaticMarkup(React.createElement(CurrencyHeader, {
+    state, gases: GAS_LIST, rates: { neon: 0, argon: 0, xenon: 0 },
+  }));
+  assert.match(html, /repeat\(3, minmax\(0, 1fr\)\)/);
+  for (const name of ["NEON", "ARGON", "XENON"]) assert.match(html, new RegExp(name));
+  assert.equal((html.match(/sekasma-currency-value/g) ?? []).length, 3);
+  assert.doesNotMatch(html, /truncate/);
+});
+
+test("app exposes a flexible ball area and a separate scrollable upgrades panel", () => {
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.match(html, /sekasma-ball-area/);
+  assert.match(html, /sekasma-ball-canvas/);
+  assert.match(html, /sekasma-panel-shell/);
+  assert.match(html, /sekasma-scroll/);
+});
+
+test("upgrade category and bulk-quantity controls have 44px touch targets", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const html = renderToStaticMarkup(React.createElement(UpgradePanel, {
+    state: freshSave(), unlockedGases: [gasById("neon")], accent: "#f582aa",
+    upTab: "help", onUpTabChange() {}, qty: 10, onQtyChange() {}, onBuy() {},
+  }));
+  assert.equal((html.match(/min-h-\[44px\]/g) ?? []).length, 8);
+  assert.match(html, /aria-pressed="true"/);
 });
