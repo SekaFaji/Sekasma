@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.8 — UI tests and maintainable components
+
+- Extract UpgradePanel from the application shell while retaining existing progression and controls
+- Add rendered React SSR regression tests for affordability, locked labels, prices and navigation
+- Improve existing purchase feedback animation; honor reduced-motion preferences
+- Remove outdated settings version copy and keep game balance unchanged
+
+
 ## 0.12.7 — Compact upgrades and adaptive mobile UI
 
 - Embed a slim affordability meter inside the relevant upgrade instead of a separate row

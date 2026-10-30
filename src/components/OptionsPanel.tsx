@@ -13,7 +13,7 @@ export default function OptionsPanel({
     <div className="flex flex-col gap-2 text-[12px]">
       <button
         onClick={onToggleScanlines}
-        className="flex items-center justify-between border-2 border-white/25 bg-[#1b1233] min-h-[44px] p-2 active:translate-y-[1px]"
+        className="flex items-center justify-between border border-white/25 bg-[#1b1233] min-h-[44px] p-2 active:translate-y-[1px]"
       >
         <span>CRT SCANLINES</span>
         <span style={{ color: scanlines ? "#61e06b" : "#ffffff70" }}>
@@ -22,7 +22,7 @@ export default function OptionsPanel({
       </button>
       <button
         onClick={onToggleBuzz}
-        className="flex items-center justify-between border-2 border-white/25 bg-[#1b1233] min-h-[44px] p-2 active:translate-y-[1px]"
+        className="flex items-center justify-between border border-white/25 bg-[#1b1233] min-h-[44px] p-2 active:translate-y-[1px]"
       >
         <span>HAPTIC BUZZ</span>
         <span style={{ color: buzz ? "#61e06b" : "#ffffff70" }}>
@@ -31,7 +31,7 @@ export default function OptionsPanel({
       </button>
       <button
         onClick={onReset}
-        className="min-h-[44px] border-2 p-2 active:translate-y-[1px]"
+        className="min-h-[44px] border p-2 active:translate-y-[1px]"
         style={{
           borderColor: confirmReset ? "#ff5ec8" : "#ffffff40",
           color: confirmReset ? "#ff5ec8" : "#ffffffb0",
@@ -40,9 +40,6 @@ export default function OptionsPanel({
       >
         {confirmReset ? "TAP AGAIN TO CONFIRM RESET" : "RESET SAVE"}
       </button>
-      <p className="px-1 text-[10px] leading-relaxed text-white/60">
-        V0.12.3 · RELIABILITY, PERFORMANCE AND READABILITY.
-      </p>
     </div>
   );
 }

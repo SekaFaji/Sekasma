@@ -60,12 +60,14 @@ src/
 │   ├── InfoRow.tsx        # Non-interactive descriptive row
 │   ├── CostChips.tsx      # Per-gas price chips
 │   ├── UnlockBar.tsx      # Affordability progress bar
+│   ├── UpgradePanel.tsx   # Upgrade tabs and purchase presentation
 │   ├── PixelIcon.tsx      # Sprite-to-icon renderer
 │   ├── StatsPanel.tsx     # Progression statistics
 │   └── OptionsPanel.tsx   # Preferences and safe reset
 └── utils/
     ├── format.ts          # Number formatting for the tabular UI
-    └── haptic.ts          # Vibration feedback where supported
+    ├── haptic.ts          # Vibration feedback where supported
+    └── progress.ts        # Multi-gas affordability percentage
 ```
 
 ## Getting started
@@ -75,14 +77,14 @@ Node.js 22 or later is required.
 ```bash
 npm ci
 npm run dev        # Vite dev server
-npm test           # Pure game logic regression tests (Node.js 22+)
+npm test           # Game-logic and rendered UI regression tests
 ```
 
 | Script              | Purpose                          |
 | ------------------- | -------------------------------- |
 | `npm run dev`       | Dev server with hot reload       |
 | `npm run typecheck` | `tsc --noEmit` under strict mode |
-| `npm test`       | Node test runner for game economy and saves |
+| `npm test`       | Node and Vite SSR game/UI regression tests |
 | `npm run build`     | Production bundle to `dist/`     |
 | `npm run preview`   | Preview the production build     |
 
@@ -101,6 +103,13 @@ Before merging a renderer change, check the following on an actual phone:
 3. Lock and unlock the screen while touching the ball; confirm the canvas resumes animation without stuck fingers.
 4. Return after leaving the browser in the background and verify idle helpers earn the expected capped offline income once.
 5. Toggle between Upgrades, Stats and Options, reset and reload, and verify saved state and UI remain usable.
+
+## Demo and portfolio verification
+
+- [Play the deployed game](https://sekafaji.github.io/Sekasma/)
+- [Review GitHub Actions checks](https://github.com/SekaFaji/Sekasma/actions/workflows/ci.yml) for game regression tests, rendered UI tests, typecheck, and build
+
+Rendered UI tests verify actual component HTML and accessibility attributes; real-touch mobile QA is still required. Screenshots and gameplay recordings should be captured from the running game rather than mocked up.
 
 ## Deployment
 
