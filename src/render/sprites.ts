@@ -3,7 +3,7 @@
  * baking (quarter turns plus a nearest-neighbour 45-degree fold), the
  * low-level canvas blitters and the tiny pixel font.
  */
-import { CX, CY, R } from "./geometry";
+import { PX, CX, CY, R } from "./geometry";
 import { GHOST_PALETTE } from "./palette";
 
 // slimmer + longer, like a human finger
@@ -166,8 +166,8 @@ export function drawOriented(
   const rad = orbitRadius - Math.round(press * 2) + len / 2;
   drawSprite(
     ctx, spr,
-    Math.round(CX + Math.cos(angle) * rad - w / 2),
-    Math.round(CY + Math.sin(angle) * rad - h / 2),
+    Math.max(0, Math.min(PX - w, Math.round(CX + Math.cos(angle) * rad - w / 2))),
+    Math.max(0, Math.min(PX - h, Math.round(CY + Math.sin(angle) * rad - h / 2))),
     palette,
   );
 }
@@ -188,8 +188,8 @@ export function drawGhost(
   ctx.globalAlpha = alpha;
   drawSprite(
     ctx, spr,
-    Math.round(CX + Math.cos(angle) * (reach + jitter) - w / 2),
-    Math.round(CY + Math.sin(angle) * (reach + jitter) - h / 2),
+    Math.max(0, Math.min(PX - w, Math.round(CX + Math.cos(angle) * (reach + jitter) - w / 2))),
+    Math.max(0, Math.min(PX - h, Math.round(CY + Math.sin(angle) * (reach + jitter) - h / 2))),
     GHOST_PALETTE,
   );
   ctx.globalAlpha = 1;
