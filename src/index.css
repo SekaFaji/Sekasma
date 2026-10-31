@@ -52,3 +52,19 @@ html, body, #root {
 .sekasma-currency-rail { scrollbar-width: thin; scrollbar-color: #56427d #120a2e; }
 .sekasma-currency-rail::-webkit-scrollbar { height: 3px; }
 .sekasma-currency-rail::-webkit-scrollbar-thumb { background: #56427d; }
+
+/* Small electric mark is reused on the title and Welcome Back screen. */
+@keyframes sekasma-logo-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+@keyframes sekasma-volts {
+  0%, 100% { opacity: .45; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-1px); }
+}
+.sekasma-logo { animation: sekasma-logo-pulse 2.2s ease-in-out infinite; }
+.sekasma-logo-volts { color: #ffd166; animation: sekasma-volts .9s ease-in-out infinite; }
+.sekasma-logo-volts-delay { animation-delay: .25s; }
+@media (prefers-reduced-motion: reduce) {
+  .sekasma-logo, .sekasma-logo-volts { animation: none; }
+}

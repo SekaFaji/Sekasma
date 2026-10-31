@@ -203,6 +203,7 @@ export default function App() {
             neonPow={neonPow}
             buzzOn={buzz}
             ghosts={state.ghosts}
+            stickmen={state.stickmen}
             onCrackle={crackle}
           />
         </div>

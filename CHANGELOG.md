@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.13 — Electric branding, compact prices, Krypton and Stickman
+
+- Center the SEKASMA logo, animate subtle electric bolts, and reuse the mark on Welcome Back
+- Display the full currency cost under BUY inside consistently sized BUY/LOCKED controls
+- Replace Stats lines with compact two-column boxed cards
+- Enlarge the plasma stand; draw Stickmen that hit the glass and leave temporary self-repairing cracks
+- Add Krypton after Xenon and a new Stickman helper whose idle contribution is serverless and save-backed
+- Migrate legacy saves safely to schema 14 and preserve existing progression
+
+
 ## 0.12.12 - Welcome Back, playtime statistics and compact purchasing
 
 - Full-screen Welcome Back summary shows time away and actual per-gas earnings, including zero-income returns

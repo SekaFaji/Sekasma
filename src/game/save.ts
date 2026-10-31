@@ -7,7 +7,7 @@ import { MAX_VOLT_STEPS, SPLIT_CAP, VOLT_STEP, zero3 } from "./config.ts";
 import type { GasId, GameState } from "./types.ts";
 
 export const SAVE_KEY = "idle-plasma-ball-save-v10";
-// Keep existing save keys stable for old installs. The internal schema is v13.
+// Keep existing save keys stable for old installs. The internal schema is v14.
 export const BACKUP_KEY = "idle-plasma-ball-save-backup-v12";
 export const LEGACY_V9_KEY = "idle-plasma-ball-save-v9";
 export const LEGACY_V8_KEY = "idle-plasma-ball-save-v8";
@@ -31,7 +31,7 @@ export function freshSave(): GameState {
   const now = Date.now();
   return {
     plasma: zero3(), total: zero3(), crackles: 0,
-    voltage: zero3(), fingers: 0, toes: 0, ghosts: 0,
+    voltage: zero3(), fingers: 0, toes: 0, ghosts: 0, stickmen: 0,
     filaments: zero3(), splits: zero3(), unlocked: ["neon"],
     created: now, lastSeen: now, activeSeconds: 0, offlineSeconds: 0,
   };
@@ -56,6 +56,7 @@ function sanitizeSave(s: GameState): GameState {
   const unlocked: GasId[] = ["neon"];
   if (rawUnlocks.includes("argon")) unlocked.push("argon");
   if (rawUnlocks.includes("argon") && rawUnlocks.includes("xenon")) unlocked.push("xenon");
+  if (unlocked.includes("xenon") && rawUnlocks.includes("krypton")) unlocked.push("krypton");
   const filaments = record(s.filaments);
   const voltage = record(s.voltage, MAX_VOLT_STEPS);
   const splits = record(s.splits, SPLIT_CAP);
@@ -71,6 +72,7 @@ function sanitizeSave(s: GameState): GameState {
     fingers: Math.floor(validNumber(s.fingers)),
     toes: Math.floor(validNumber(s.toes)),
     ghosts: Math.floor(validNumber(s.ghosts)),
+    stickmen: Math.floor(validNumber(s.stickmen)),
     created: validNumber(s.created, fallback.created),
     lastSeen: validNumber(s.lastSeen, fallback.lastSeen),
     activeSeconds: validNumber(s.activeSeconds),
@@ -82,10 +84,11 @@ function sanitizeSave(s: GameState): GameState {
 export function migrateSave(old: Record<string, unknown>): GameState {
   const base = freshSave();
   // v10 / v9 saves: load as-is (v9 predates splits)
-  if (old.v === 13 || old.v === 12 || old.v === 11 || old.v === 10 || old.v === 9) {
+  if (old.v === 14 || old.v === 13 || old.v === 12 || old.v === 11 || old.v === 10 || old.v === 9) {
     const s = { ...base, ...(old as unknown as GameState) };
     if (!s.splits) s.splits = zero3();
     if (typeof s.ghosts !== "number") s.ghosts = 0;
+    if (typeof s.stickmen !== "number") s.stickmen = 0;
     return sanitizeSave(s);
   }
   // v6 save: single currency, volts were x2 levels
@@ -100,7 +103,8 @@ export function migrateSave(old: Record<string, unknown>): GameState {
     base.toes = (old.toes as number) ?? 0;
     base.filaments.neon = (old.filaments as number) ?? 0;
     base.unlocked =
-      gas === "xenon" ? ["neon", "argon", "xenon"]
+      gas === "krypton" ? ["neon", "argon", "xenon", "krypton"]
+      : gas === "xenon" ? ["neon", "argon", "xenon"]
       : gas === "argon" ? ["neon", "argon"]
       : ["neon"];
     base.created = (old.created as number) ?? Date.now();
@@ -164,7 +168,7 @@ export function persist(s: GameState): boolean {
         // Leave the existing backup untouched.
       }
     }
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 13 }));
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 14 }));
     return true;
   } catch {
     // No storage (e.g. private browsing): retain the in-memory session.
