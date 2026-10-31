@@ -7,15 +7,14 @@ import type { GasRecord } from "./types.ts";
 // a "crackle" = one press on the glass
 export const PRESS_INTERVAL = 2.2; // hired help presses this often
 export const HOLD_INTERVAL = 1.2; // manual crackles while held (per finger)
-export const TOE_MULT = 8; // a foot presses 8x harder than a finger
+/** Fixed base power per helper type. These values do not depend on finger ownership. */
+export const HELPER_POWER = { finger: 1, toe: 8, ghost: 20, stickman: 45 } as const;
 export const OFFLINE_CAP_S = 8 * 3600;
 
 export const FIL_BASE: GasRecord = { neon: 12, argon: 30, xenon: 80, krypton: 180 };
 export const VOLT_BASE: GasRecord = { neon: 6, argon: 16, xenon: 48, krypton: 120 };
 export const SPLIT_BASE: GasRecord = { neon: 20, argon: 60, xenon: 150, krypton: 320 };
 export const SPLIT_CAP = 8; // max branches per gas
-export const GHOST_MULT = 20; // a ghost hand presses 20x harder than a finger
-export const STICKMAN_MULT = 45; // a stickman smacks the glass hard
 
 // a split string: every branch carries 0.75x → 1 split = 1.5x output
 export const splitMult = (n: number) => (n <= 0 ? 1 : 0.75 * (1 + n));

@@ -56,7 +56,7 @@ test("gas-locked upgrade uses a locked label without a useless 0% bar", () => {
   assert.match(html, /LOCKED/);
   assert.match(html, /role="progressbar"/);
   assert.match(html, /aria-valuenow="35"/);
-  assert.ok(html.includes("w-[78px]"));
+  assert.ok(html.includes("w-[94px]"));
 });
 
 test("affordable upgrades keep a readable price without progress bars", () => {
@@ -149,7 +149,7 @@ test("every repeatable upgrade exposes per-row quantity choices and a fixed BUY 
     assert.ok(html.includes(label), label);
   }
   assert.match(html, /aria-pressed="true"/);
-  assert.ok(html.includes('w-[78px]'));
+  assert.ok(html.includes('w-[94px]'));
   const header = renderToStaticMarkup(React.createElement(CurrencyHeader, {
     state, gases: [gasById("neon")], rates: plasma(0),
   }));
@@ -217,9 +217,10 @@ test("purchase buttons show their gas price under BUY", () => {
   }));
   assert.match(markup, /<button[^>]*aria-label="Buy FINGER"[^>]*>/);
   assert.match(markup, /BUY/);
-  assert.match(markup, /50N/);
-  assert.match(markup, /10A/);
-  assert.ok(markup.includes('w-[78px]'));
+  assert.match(markup, /aria-label="neon: 50"/);
+  assert.match(markup, /aria-label="argon: 10"/);
+  assert.match(markup, /sekasma-price-grid/);
+  assert.ok(markup.includes('w-[94px]'));
 });
 
 test("boxed stats include Stickman helper counts", async () => {
@@ -239,8 +240,8 @@ test("affordability progress uses an identical fixed-size slot across affordabil
   const poor = renderToStaticMarkup(React.createElement(UpgradeRow, { ...props, disabled: true }));
   const rich = renderToStaticMarkup(React.createElement(UpgradeRow, { ...props, disabled: false }));
   for (const markup of [poor, rich]) {
-    assert.ok(markup.includes('h-[66px]'));
-    assert.ok(markup.includes('h-[12px]'));
+    assert.ok(markup.includes('h-[52px]'));
+    assert.ok(markup.includes('h-[10px]'));
     assert.ok(markup.includes('sekasma-upgrade-sub'));
   }
   assert.match(poor, /role="progressbar"/);
@@ -255,4 +256,36 @@ test("SEKASMA logo is pixel-drawn and keeps the Welcome Back mark reusable", () 
   assert.match(big, /sekasma-pixel-logo-large/);
   assert.ok((logo.match(/<rect/g) ?? []).length > 70);
   assert.doesNotMatch(logo, /⚡/);
+});
+
+test("all four helper upgrades are rendered as compact rows on HELP", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { GAS_LIST } = await import("../src/game/gases.ts");
+  const state = { ...freshSave(), unlocked: GAS_LIST.map(g => g.id), plasma: {
+    neon: 1e9, argon: 1e9, xenon: 1e9, krypton: 1e9,
+  } };
+  const html = renderToStaticMarkup(React.createElement(UpgradePanel, {
+    state, unlockedGases: GAS_LIST, accent: "#ffd166", upTab: "help",
+    onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {},
+  }));
+  assert.equal((html.match(/h-\[52px\]/g) ?? []).length, 4);
+  for (const power of [1, 8, 20, 45]) assert.match(html, new RegExp(`POWER ${power} · OWN`));
+  assert.doesNotMatch(html, /× FINGER/);
+  const app = renderToStaticMarkup(React.createElement(App));
+  assert.match(app, /sekasma-panel-shell--help/);
+});
+
+test("four-currency BUY shows each unique gas bolt without overflowing a price grid", () => {
+  const html = renderToStaticMarkup(React.createElement(UpgradeRow, {
+    name: "FINGER", sub: "POWER 1", icon: "F", onBuy() {},
+    cost: { neon: 884000, argon: 80900, xenon: 7830, krypton: 1050000 }, disabled: false,
+    plasma: plasma(0),
+  }));
+  assert.ok(html.includes('sekasma-price-grid'));
+  assert.ok(html.includes('grid-cols-2'));
+  assert.ok(html.includes('overflow-hidden'));
+  for (const gas of ["neon", "argon", "xenon", "krypton"])
+    assert.ok(html.includes(`aria-label="${gas}:`), gas);
+  assert.equal((html.match(/viewBox="0 0 7 8"/g) ?? []).length, 4);
+  assert.ok(html.includes('w-[94px]'));
 });

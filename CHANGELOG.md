@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.15 — Four visible helpers, individual power and gas-bolt prices
+
+- Fit all four HELP upgrade rows together on typical Android phone screens with shorter, stable row heights and a HELP-specific panel height
+- Replace the "x FINGER" text with fixed base power stats per helper (Finger 1, Big Toe 8, Ghost Hand 20, Stickman 45)
+- Centralize those power constants in the economy without changing current rates, purchases, upgrades or save data
+- Display each noble gas price inside BUY with its own colored, custom-shaped pixel lightning bolt
+- Arrange multi-currency prices in two compact columns to stop long prices spilling outside the BUY button
+- Add UI and economy tests for four helper rows, fixed helper power and four unique currency bolts
+
+
 ## 0.12.14 — Stable upgrades, plasma pixel logo and animated Stickmen
 
 - Give upgrade rows and their subtitle/progress slots fixed height so affordability bars never shift adjacent items

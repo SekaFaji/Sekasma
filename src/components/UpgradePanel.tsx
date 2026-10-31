@@ -4,7 +4,7 @@ import UpgradeRow, { type BuyQuantity } from "./UpgradeRow";
 import InfoRow from "./InfoRow";
 import PixelIcon from "./PixelIcon";
 import { nextGas } from "../game/gases";
-import { SPLIT_CAP, STICKMAN_MULT, fmtVolts, splitMult, voltMult } from "../game/config";
+import { SPLIT_CAP, HELPER_POWER, fmtVolts, splitMult, voltMult } from "../game/config";
 import { bulkCost, canAfford, cracklePower, peekCost } from "../game/economy";
 import type { BuyKind } from "../game/economy";
 import { fmt } from "../utils/format";
@@ -95,7 +95,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                 <>
                   <UpgradeRow
                     name="FINGER"
-                    sub={`ALL GASES · OWN ${state.fingers}` +
+                    sub={`POWER ${HELPER_POWER.finger} · OWN ${state.fingers}` +
                       (fingerBuy.count > 1 ? ` · +${fingerBuy.count}` : "")}
                     cost={fingerBuy.cost}
                     icon={<PixelIcon sprite={FINGER_SPRITE} palette={SKIN_PALETTE} px={2} />}
@@ -108,7 +108,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                   {argonUnlocked
                     ? <UpgradeRow
                         name="BIG TOE"
-                        sub={`8× FINGER · OWN ${state.toes}` +
+                        sub={`POWER ${HELPER_POWER.toe} · OWN ${state.toes}` +
                           (toeBuy.count > 1 ? ` · +${toeBuy.count}` : "")}
                         cost={toeBuy.cost}
                         icon={<PixelIcon sprite={FOOT_SPRITE} palette={SKIN_PALETTE} px={3} />}
@@ -137,7 +137,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                   {xenonUnlocked
                     ? <UpgradeRow
                         name="GHOST HAND"
-                        sub={`20× FINGER · OWN ${state.ghosts}` +
+                        sub={`POWER ${HELPER_POWER.ghost} · OWN ${state.ghosts}` +
                           (ghostBuy.count > 1 ? ` · +${ghostBuy.count}` : "")}
                         cost={ghostBuy.cost}
                         icon={<PixelIcon sprite={GHOST_SPRITE} palette={GHOST_PALETTE} px={3} />}
@@ -166,7 +166,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                   {kryptonUnlocked
                     ? <UpgradeRow
                         name="STICKMAN"
-                        sub={`${STICKMAN_MULT}× FINGER · OWN ${state.stickmen}` +
+                        sub={`POWER ${HELPER_POWER.stickman} · OWN ${state.stickmen}` +
                           (stickBuy.count > 1 ? ` · +${stickBuy.count}` : "")}
                         cost={stickBuy.cost}
                         icon={<PixelIcon sprite={STICKMAN_SPRITE} palette={STICKMAN_PALETTE} px={3} />}
