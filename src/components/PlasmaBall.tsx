@@ -24,7 +24,7 @@ import type { Ripple, FloatText, Flash, HoldArc, Wanderer } from "../render/plas
 import type { Gas, GasRecord } from "../game/types";
 
 export default function PlasmaBall({
-  filaments, splits, unlocked, fingers, toes, ghosts, crackles, neonPow, onCrackle, buzzOn,
+  filaments, splits, unlocked, fingers, toes, ghosts, stickmen, crackles, neonPow, onCrackle, buzzOn,
 }: {
   filaments: GasRecord;
   splits: GasRecord;
@@ -32,6 +32,7 @@ export default function PlasmaBall({
   fingers: number;
   toes: number;
   ghosts: number;
+  stickmen: number;
   crackles: number;
   neonPow: number;
   onCrackle: (fingerCount: number) => void;
@@ -42,11 +43,13 @@ export default function PlasmaBall({
   const ripples = useRef<Ripple[]>([]);
   const texts = useRef<FloatText[]>([]);
   const flashes = useRef<Flash[]>([]);
+  const glassCracks = useRef<{ x: number; y: number; age: number; ttl: number; seed: number }[]>([]);
   const holdArcs = useRef<HoldArc[]>([]);
   const fingerSeeds = useRef<Wanderer[]>([]);
   const toeSeeds = useRef<Wanderer[]>([]);
-  const propsRef = useRef({ filaments, splits, unlocked, fingers, toes, ghosts, crackles });
-  propsRef.current = { filaments, splits, unlocked, fingers, toes, ghosts, crackles };
+  const stickTimers = useRef<number[]>([]);
+  const propsRef = useRef({ filaments, splits, unlocked, fingers, toes, ghosts, stickmen, crackles });
+  propsRef.current = { filaments, splits, unlocked, fingers, toes, ghosts, stickmen, crackles };
   const neonPowRef = useRef(neonPow);
   neonPowRef.current = neonPow;
   const buzzRef = useRef(buzzOn);
@@ -76,12 +79,13 @@ export default function PlasmaBall({
         b.fillRect(x, y, 1, 1);
       }
       b.globalAlpha = 1;
-      // stand under the ball
+      // Wider stepped stand to make the sphere feel grounded.
       b.fillStyle = "#14102a";
-      b.fillRect(CX - 7, CY + R + 1, 14, 3);
-      b.fillRect(CX - 11, CY + R + 4, 22, 2);
+      b.fillRect(CX - 9, CY + R + 1, 18, 4);
+      b.fillRect(CX - 16, CY + R + 5, 32, 3);
       b.fillStyle = "#1f1838";
-      b.fillRect(CX - 4, CY + R + 1, 8, 1);
+      b.fillRect(CX - 5, CY + R + 2, 10, 1);
+      b.fillRect(CX - 11, CY + R + 6, 22, 1);
     }
 
     // ---- glass cache: dead + lit, rebuilt when gases change ----
@@ -208,6 +212,40 @@ export default function PlasmaBall({
       return u[u.length - 1];
     };
 
+    const drawStickman = (x: number, y: number, swing: number) => {
+      const sx = Math.round(x), sy = Math.round(y);
+      ctx.fillStyle = "#20152e";
+      ctx.fillRect(sx + 1, sy, 3, 3);
+      ctx.fillRect(sx + 2, sy + 3, 1, 3);
+      ctx.fillRect(sx + 1, sy + 6, 1, 2);
+      ctx.fillRect(sx + 3, sy + 6, 1, 2);
+      ctx.fillStyle = "#fff2c7";
+      ctx.fillRect(sx + 2, sy + 1, 1, 1);
+      ctx.fillStyle = "#20152e";
+      ctx.fillRect(sx + (swing ? 3 : 1), sy + 3, 2, 1);
+      ctx.fillRect(sx + 1, sy + 4, swing ? 4 : 2, 1);
+      if (swing) {
+        ctx.fillStyle = "#ffb347";
+        ctx.fillRect(sx + 5, sy + 4, 1, 1);
+        ctx.fillStyle = "#fff1c7";
+        ctx.fillRect(sx + 6, sy + 4, 1, 1);
+      }
+    };
+    const drawGlassCrack = (crack: { x: number; y: number; age: number; ttl: number; seed: number }) => {
+      ctx.globalAlpha = Math.max(0, 1 - crack.age / crack.ttl) * 0.9;
+      ctx.fillStyle = "#fff1c7";
+      for (let i = 0; i < 3; i++) {
+        const dir = -Math.PI / 2 + (i - 1) * 0.55 + Math.sin(crack.seed + i) * 0.08;
+        let px = crack.x, py = crack.y;
+        for (let step = 0; step < 4; step++) {
+          px += Math.cos(dir + step * 0.16) * 2;
+          py += Math.sin(dir + step * 0.11) * 2;
+          ctx.fillRect(Math.round(px), Math.round(py), 1, 1);
+        }
+      }
+      ctx.globalAlpha = 1;
+    };
+
     const newFlash = (x: number, y: number, foot: boolean): Flash => ({
       x, y, age: 0,
       forks: foot ? 3 : Math.random() < 0.3 ? 2 : 1,
@@ -252,10 +290,11 @@ export default function PlasmaBall({
       const dt = Math.max(0, Math.min((now - last) / 1000, 0.1));
       last = now;
 
-      const { filaments: fil, fingers: fing, toes: toe, unlocked: u, crackles: crk } = propsRef.current;
+      const { filaments: fil, fingers: fing, toes: toe, ghosts: ghs, stickmen: stm, unlocked: u, crackles: crk } = propsRef.current;
       const visibleFingers = visibleHelperCount(fing, "fingers");
       const visibleToes = visibleHelperCount(toe, "toes");
       const visibleGhosts = visibleHelperCount(propsRef.current.ghosts, "ghosts");
+      const visibleStickmen = visibleHelperCount(propsRef.current.stickmen, "stickmen");
       const sig = u.map((g) => g.id).join(",");
       if (cache.sig !== sig) buildBg(sig);
 
@@ -494,6 +533,31 @@ export default function PlasmaBall({
       runHelpers(fingerSeeds, visibleFingers, FINGER_ORIENTS, false, false);
       runHelpers(toeSeeds, visibleToes, FOOT_ORIENTS, true, false);
 
+      // Stickmen attack the globe; cracks fade and visually self-repair.
+      while (stickTimers.current.length < visibleStickmen)
+        stickTimers.current.push(t + 0.5 + Math.random() * 1.5);
+      if (stickTimers.current.length > visibleStickmen)
+        stickTimers.current.length = visibleStickmen;
+      for (let i = 0; i < visibleStickmen; i++) {
+        const ratio = visibleStickmen <= 1 ? 0.5 : i / (visibleStickmen - 1);
+        const angle = Math.PI / 2 + (ratio - 0.5) * 0.95;
+        const x = CX + Math.cos(angle) * (R - 4);
+        const y = CY + Math.sin(angle) * (R - 4);
+        if (t >= stickTimers.current[i]) {
+          stickTimers.current[i] = t + 1.2 + Math.random() * 1.8;
+          glassCracks.current.push({ x, y, age: 0, ttl: 0.45 + Math.random() * 0.25, seed: t + i * 1.3 });
+          flashes.current.push({ x, y, age: 0, forks: 2, amp: 4.5, gas: pickGas() });
+          ripples.current.push({ x, y, age: 0, color: "#ffd166" });
+        }
+        const swinging = stickTimers.current[i] - t < 0.16 ? 1 : 0;
+        drawStickman(x - 4, CY + R + 1 + Math.abs(ratio - 0.5) * 5, swinging);
+      }
+      glassCracks.current = glassCracks.current.filter((crack) => crack.age < crack.ttl);
+      for (const crack of glassCracks.current) {
+        crack.age += dt;
+        drawGlassCrack(crack);
+      }
+
       // ---- your fingers on the glass (one sprite per touch) ----
       for (const [, p] of pts)
         drawSprite(ctx, PLAYER_FINGER, Math.round(p.x) - 4, Math.round(p.y) - 2, SKIN_PALETTE);
@@ -516,7 +580,7 @@ export default function PlasmaBall({
       }
 
       // ---- hint on a brand-new dark ball ----
-      if (crk === 0 && !held && fing === 0 && toe === 0) {
+      if (crk === 0 && !held && fing === 0 && toe === 0 && ghs === 0 && stm === 0) {
         ctx.globalAlpha = 0.5 + Math.sin(t * 3) * 0.4;
         drawPixelText(ctx, CX, CY + 20, "PRESS THE BALL", "#ffffff");
         ctx.globalAlpha = 1;
