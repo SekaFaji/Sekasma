@@ -96,6 +96,9 @@ The repository contains an npm-generated `package-lock.json` (lockfile v3). Use 
 
 ## Mobile browser smoke test
 
+Version 0.12.17: with 80 Fingers purchased, inspect the sphere for a dense, mobile array of individually drawn Fingers instead of only 7. Toes and Ghost Hands also remain on-screen in full; Stickmen continue to roam and strike. At higher counts, flashes are sampled for mobile performance, not sprites or income. Change between HELP, GAS and POWER: the lower panel must keep the same height with no jump. You can still scroll within the shared panel on short screens. There is **no Prestige ownership cap yet**; that needs its own approved progression rules.
+
+
 For 0.12.16, open STATS and verify GENERAL STATS plus each unlocked gas section show four compact boxes per row, with long values readable. OPTIONS contains real external links for SekaFaji GitHub, SekaFaji Games Discord and YouTube that open in a new tab without resetting progress. After capping NEON ARC, the 1/5/10/100/MAX buttons should disappear for that row, but stay available for unmaxed VOLTS and SPLIT, including purchases that are simply unaffordable.
 
 

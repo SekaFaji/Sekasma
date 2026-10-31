@@ -4,7 +4,7 @@ import { accrueIdle, accrueOffline, bulkCost, cappedOfflineSeconds, fingerCost, 
 import { OFFLINE_CAP_S, HELPER_POWER, PRESS_INTERVAL } from "../src/game/config.ts";
 import { BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
 import { measureTick } from "../src/game/timing.ts";
-import { visibleHelperCount, visibleHelperCounts, MAX_VISIBLE_HELPERS } from "../src/render/limits.ts";
+import { visibleHelperCount, visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../src/render/limits.ts";
 import { advanceStickman, createStickman } from "../src/render/stickmen.ts";
 
 test("offline settlement is capped and handles negative time", () => {
@@ -84,14 +84,14 @@ test("v6 saves still migrate to a safe game state", () => {
   assert.equal(state.activeSeconds, 0);
 });
 
-test("visual helper caps never limit economy ownership or income", () => {
+test("all owned helpers remain visible and contribute their full income", () => {
   const s = { ...freshSave(), fingers: 5000, toes: 100, ghosts: 30, unlocked: ["neon", "argon", "xenon"] };
   const earned = accrueIdle(s, 10).gain.neon;
   assert.ok(earned > accrueIdle({ ...s, fingers: 20, toes: 12, ghosts: 10 }, 10).gain.neon);
-  assert.equal(visibleHelperCount(s.fingers, "fingers"), 7);
-  assert.equal(visibleHelperCount(s.toes, "toes"), 4);
-  assert.equal(visibleHelperCount(s.ghosts, "ghosts"), 4);
-  assert.equal(visibleHelperCount(10, "stickmen"), 4);
+  assert.equal(visibleHelperCount(s.fingers, "fingers"), 5000);
+  assert.equal(visibleHelperCount(s.toes, "toes"), 100);
+  assert.equal(visibleHelperCount(s.ghosts, "ghosts"), 30);
+  assert.equal(visibleHelperCount(10, "stickmen"), 10);
   assert.equal(visibleHelperCount(-10, "fingers"), 0);
 });
 
@@ -231,9 +231,10 @@ test("v13 save migrations preserve old progress and add Krypton and Stickmen", (
   assert.deepEqual(result.unlocked, ["neon"]);
 });
 
-test("all helper types share a twelve-sprite on-screen budget, not an income cap", () => {
+test("every type receives its full owned sprite count, even with hundreds", () => {
   const counts = visibleHelperCounts({ fingers: 200, toes: 30, ghosts: 40, stickmen: 500 });
-  assert.equal(Object.values(counts).reduce((a, b) => a + b, 0), MAX_VISIBLE_HELPERS);
+  assert.deepEqual(counts, { fingers: 200, toes: 30, ghosts: 40, stickmen: 500 });
+  assert.equal(Object.values(counts).reduce((a, b) => a + b, 0), 770);
   assert.ok(Object.values(counts).every(n => n > 0));
   assert.deepEqual(visibleHelperCounts({ fingers: 0, toes: 0, ghosts: 0, stickmen: 0 }),
     { fingers: 0, toes: 0, ghosts: 0, stickmen: 0 });
@@ -273,4 +274,23 @@ test("helper types have independent fixed power values, not finger-owned scaling
       accrueIdle({ ...after, [field]: 0 }, PRESS_INTERVAL).gain.neon;
     assert.ok(Math.abs(contribution - neonGas.baseRate * power) < 1e-9);
   }
+});
+
+test("helpers occupy distinct orbital rings without a visual hard limit", () => {
+  const radii = Array.from({ length: 80 }, (_, i) => helperOrbitRadius("fingers", i, 57));
+  assert.equal(new Set(radii).size, 3);
+  assert.ok(radii.every(r => r > 57));
+  assert.ok(helperOrbitRadius("ghosts", 0, 57) < 57);
+  assert.ok(helperOrbitRadius("stickmen", 1, 57) > 57);
+  assert.equal(visibleHelperCount(Infinity, "fingers"), 0);
+  assert.equal(visibleHelperCount(80.9, "fingers"), 80);
+});
+
+test("costly lighting is sampled independently without hiding any sprites", () => {
+  assert.equal(helperEffectChance({ fingers: 80, toes: 10, ghosts: 5, stickmen: 4 }), 1);
+  const crowd = { fingers: 5000, toes: 1000, ghosts: 200, stickmen: 300 };
+  assert.ok(helperEffectChance(crowd) > 0 && helperEffectChance(crowd) < 0.05);
+  assert.equal(visibleHelperCounts(crowd).fingers, 5000);
+  assert.equal(visibleHelperCounts(crowd).stickmen, 300);
+  assert.equal(helperEffectChance({ fingers: 0, toes: 0, ghosts: 0, stickmen: 0 }), 1);
 });
