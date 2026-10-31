@@ -220,7 +220,7 @@ export default function PlasmaBall({
 
     const drawStickman = (x: number, y: number, attack: boolean, stride: boolean, facing: number) => {
       ctx.save();
-      ctx.translate(Math.round(Math.max(7, Math.min(PX - 8, x))), Math.round(Math.max(10, Math.min(PX - 4, y))));
+      ctx.translate(Math.round(x), Math.round(y));
       ctx.scale(facing, 1);
       // Walking legs, alternating foot positions, separate from the attack pose.
       ctx.fillStyle = "#20152e";

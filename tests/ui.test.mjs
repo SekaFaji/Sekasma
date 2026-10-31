@@ -360,3 +360,19 @@ test("switching HELP, GAS and POWER keeps one stable panel shell", () => {
   assert.equal((html.match(/sekasma-panel-shell relative/g) ?? []).length, 1);
   assert.doesNotMatch(html, /sekasma-panel-shell--help/);
 });
+
+test("upgrade tabs appear in requested HELP, POWER, GAS order", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  for (const active of ["help", "power", "gas"]) {
+    const html = renderToStaticMarkup(React.createElement(UpgradePanel, {
+      state: freshSave(), unlockedGases: [gasById("neon")], accent: "#f582aa",
+      upTab: active, onUpTabChange() {}, quantities: {},
+      onQuantityChange() {}, onBuy() {},
+    }));
+    const labels = [...html.matchAll(/<button[^>]+role="tab"[^>]*>([\s\S]*?)<\/button>/g)]
+      .map(match => match[1].replace(/<[^>]+>/g, "").trim());
+    assert.deepEqual(labels, ["HELP", "POWER", "GAS"]);
+    assert.equal((html.match(/aria-selected="true"/g) ?? []).length, 1);
+  }
+});

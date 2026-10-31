@@ -166,8 +166,8 @@ export function drawOriented(
   const rad = orbitRadius - Math.round(press * 2) + len / 2;
   drawSprite(
     ctx, spr,
-    Math.max(0, Math.min(PX - w, Math.round(CX + Math.cos(angle) * rad - w / 2))),
-    Math.max(0, Math.min(PX - h, Math.round(CY + Math.sin(angle) * rad - h / 2))),
+    Math.round(CX + Math.cos(angle) * rad - w / 2),
+    Math.round(CY + Math.sin(angle) * rad - h / 2),
     palette,
   );
 }

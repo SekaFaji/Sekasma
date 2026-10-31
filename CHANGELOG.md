@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.18 — Proper helper orbits and upgrade tab order
+
+- Reorder upgrade subtabs to HELP → POWER → GAS without changing content or unlock behavior
+- Move the plasma globe's logical center slightly lower to provide sprite headroom while keeping the stand on screen
+- Replace exterior Finger/Toe/Stickman orbit rings with staggered, inside-the-surface rings that fit the 150px canvas
+- Remove coordinate clamping that previously pinned many Fingers and Stickmen into straight lines along canvas edges
+- Preserve the full visible helper army, motion, costs, income, touch controls and existing saves
+- Add geometry tests over every orbital angle to catch clipping regressions and UI tests for tab order
+- Leave PRESTIGE as a planned fourth main tab until capacity, reset and rewards design is approved
+
+
 ## 0.12.17 — Full visible helper army and consistent panels
 
 - Remove per-type and shared visual helper caps; every purchased Finger, Big Toe, Ghost Hand and Stickman is represented in the plasma animation
