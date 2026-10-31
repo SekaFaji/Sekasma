@@ -1,3 +1,4 @@
+import SekasmaLogo from "./SekasmaLogo";
 import { GAS_LIST } from "../game/gases";
 import type { GasRecord } from "../game/types";
 import { fmt } from "../utils/format";
@@ -15,7 +16,7 @@ export default function WelcomeBack({ summary, onContinue }: {
     <div role="dialog" aria-modal="true" aria-labelledby="welcome-title"
       className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#050310]/95 px-3 py-4">
       <div className="w-full max-w-[400px] border-2 border-[#7552af] bg-[#110a29] p-4 text-white shadow-[0_0_40px_#38215480]">
-        <div className="text-center text-[11px] tracking-[0.25em] text-[#bb9fed]">SEKASMA</div>
+        <div className="flex justify-center"><SekasmaLogo big /></div>
         <h2 id="welcome-title" className="mt-4 text-center text-[23px] font-bold tracking-widest text-[#f4dcff]">
           WELCOME BACK
         </h2>
