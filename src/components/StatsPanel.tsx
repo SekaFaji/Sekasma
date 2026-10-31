@@ -3,15 +3,15 @@ import { cracklePower } from "../game/economy";
 import { fmtVolts, splitMult } from "../game/config";
 import type { Gas, GasRecord, GameState } from "../game/types";
 import { fmt } from "../utils/format";
+import { formatDuration } from "../utils/time";
 
 /** Read-only progression statistics; the application shell owns the state. */
 export default function StatsPanel({
-  state, unlockedGases, rates, playSec,
+  state, unlockedGases, rates,
 }: {
   state: GameState;
   unlockedGases: Gas[];
   rates: GasRecord;
-  playSec: number;
 }) {
   return (
     <div className="flex flex-col gap-1 text-[12px]">
@@ -20,7 +20,9 @@ export default function StatsPanel({
         ["FINGERS HIRED", String(state.fingers)],
         ["FEET HIRED", String(state.toes)],
         ["GHOST HANDS", String(state.ghosts)],
-        ["TIME PLAYED", `${Math.floor(playSec / 3600)}H ${Math.floor((playSec % 3600) / 60)}M`],
+        ["TOTAL PLAYTIME", formatDuration(state.activeSeconds + state.offlineSeconds)],
+        ["ACTIVE ONLINE", formatDuration(state.activeSeconds)],
+        ["OFFLINE PLAYTIME", formatDuration(state.offlineSeconds)],
       ].map(([key, value]) => (
         <div key={key} className="flex justify-between border-b border-white/10 px-1 py-1.5">
           <span className="text-white/60">{key}</span>

@@ -12,6 +12,8 @@ let App;
 let OptionsPanel;
 let UpgradePanel;
 let CurrencyHeader;
+let WelcomeBack;
+let StatsPanel;
 
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: "custom", logLevel: "error" });
@@ -20,6 +22,8 @@ before(async () => {
   ({ default: OptionsPanel } = await server.ssrLoadModule("/src/components/OptionsPanel.tsx"));
   ({ default: UpgradePanel } = await server.ssrLoadModule("/src/components/UpgradePanel.tsx"));
   ({ default: CurrencyHeader } = await server.ssrLoadModule("/src/components/CurrencyHeader.tsx"));
+  ({ default: WelcomeBack } = await server.ssrLoadModule("/src/components/WelcomeBack.tsx"));
+  ({ default: StatsPanel } = await server.ssrLoadModule("/src/components/StatsPanel.tsx"));
 });
 after(async () => { if (server) await server.close(); });
 
@@ -45,10 +49,12 @@ test("unaffordable upgrade embeds one accessible compact progress meter", () => 
 test("gas-locked upgrade uses a locked label without a useless 0% bar", () => {
   const html = renderToStaticMarkup(React.createElement(UpgradeRow, {
     name: "GHOST HAND", sub: "UNLOCKS WITH XENON GAS",
-    icon: "G", cost: { xenon: 80 }, onBuy() {}, disabled: true, locked: true, plasma: plasma(0),
+    icon: "G", cost: { xenon: 80 }, unlockCost: { neon: 100 }, onBuy() {}, disabled: true, locked: true, plasma: plasma(35),
   }));
   assert.match(html, /LOCKED/);
-  assert.doesNotMatch(html, /role="progressbar"/);
+  assert.match(html, /role="progressbar"/);
+  assert.match(html, /aria-valuenow="35"/);
+  assert.ok(html.includes("w-[65px]"));
 });
 
 test("affordable upgrades keep a readable price without progress bars", () => {
@@ -65,7 +71,7 @@ test("app renders navigation and upgrade cards with genuine React markup", () =>
   assert.match(html, /UPGRADES/);
   assert.match(html, /role="tablist"/);
   assert.match(html, /FINGER/);
-  assert.match(html, /PLASMA BALL/);
+  assert.match(html, /SEKASMA/);
 });
 
 test("settings show a neutral initial reset action and accessible pressed states", () => {
@@ -95,7 +101,7 @@ test("upgrade category tabs expose their selected states", async () => {
   const { gasById } = await import("../src/game/gases.ts");
   const html = renderToStaticMarkup(React.createElement(UpgradePanel, {
     state: freshSave(), unlockedGases: [gasById("neon")], accent: "#f582aa",
-    upTab: "help", onUpTabChange() {}, qty: 5, onBuy() {},
+    upTab: "help", onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {},
   }));
   assert.match(html, /role="tablist"/);
   assert.match(html, /role="tabpanel"/);
@@ -109,11 +115,12 @@ test("currency header keeps gas totals in distinct, wrapping cards", async () =>
   const state = { ...freshSave(), unlocked: ["neon", "argon", "xenon"] };
   const html = renderToStaticMarkup(React.createElement(CurrencyHeader, {
     state, gases: GAS_LIST, rates: { neon: 0, argon: 0, xenon: 0 },
-    qty: 1, onQtyChange() {},
   }));
-  assert.match(html, /repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(html, /sekasma-currency-rail/);
+  assert.equal((html.match(/role="listitem"/g) ?? []).length, 3);
   for (const name of ["NEON", "ARGON", "XENON"]) assert.match(html, new RegExp(name));
-  assert.equal((html.match(/sekasma-currency-value/g) ?? []).length, 3);
+  assert.match(html, /aria-label="Gas balances"/);
+  assert.doesNotMatch(html, /Bulk buy quantity/);
   assert.doesNotMatch(html, /truncate/);
 });
 
@@ -125,23 +132,26 @@ test("app exposes a flexible ball area and a separate scrollable upgrades panel"
   assert.match(html, /sekasma-scroll/);
 });
 
-test("all five bulk-buy choices are in one compact header selector", async () => {
+test("every repeatable upgrade exposes per-row quantity choices and a fixed BUY action", async () => {
   const { freshSave } = await import("../src/game/save.ts");
   const { gasById } = await import("../src/game/gases.ts");
   const state = freshSave();
-  const header = renderToStaticMarkup(React.createElement(CurrencyHeader, {
-    state, gases: [gasById("neon")], rates: plasma(0), qty: 10, onQtyChange() {},
-  }));
-  const upgrades = renderToStaticMarkup(React.createElement(UpgradePanel, {
+  const html = renderToStaticMarkup(React.createElement(UpgradePanel, {
     state, unlockedGases: [gasById("neon")], accent: "#f582aa",
-    upTab: "help", onUpTabChange() {}, qty: 10, onBuy() {},
+    upTab: "help", onUpTabChange() {}, quantities: { finger: 10 },
+    onQuantityChange() {}, onBuy() {},
   }));
-  assert.match(header, /aria-label="Bulk buy quantity"/);
-  for (const choice of ["1", "5", "10", "100", "max"])
-    assert.ok(header.includes(`value="${choice}"`), choice);
-  assert.match(header, /value="10" selected=""/);
-  assert.doesNotMatch(upgrades, /Bulk buy quantity|aria-pressed=/);
-  assert.ok(upgrades.includes("min-h-[36px]"));
+  assert.match(html, /aria-label="FINGER quantity"/);
+  for (const value of ["1", "5", "10", "100", "max"]) {
+    const label = value === "max" ? "Buy maximum FINGER" : `Buy ${value} FINGER`;
+    assert.ok(html.includes(label), label);
+  }
+  assert.match(html, /aria-pressed="true"/);
+  assert.ok(html.includes('w-[65px]'));
+  const header = renderToStaticMarkup(React.createElement(CurrencyHeader, {
+    state, gases: [gasById("neon")], rates: plasma(0),
+  }));
+  assert.doesNotMatch(header, /Bulk buy quantity/);
 });
 
 test("unaffordable but available upgrades retain an unobtrusive 0% meter", () => {
@@ -159,11 +169,41 @@ test("original HELP, GAS and POWER upgrades remain visible", async () => {
   const { gasById } = await import("../src/game/gases.ts");
   const state = freshSave();
   const shared = { state, unlockedGases: [gasById("neon")], accent: "#f582aa",
-    onUpTabChange() {}, qty: "max", onBuy() {} };
+    onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {} };
   const help = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "help" }));
   const gas = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "gas" }));
   const power = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "power" }));
   for (const label of ["FINGER", "BIG TOE", "GHOST HAND"]) assert.match(help, new RegExp(label));
   assert.match(gas, /ARGON GAS/);
   for (const label of ["NEON ARC", "NEON VOLTS", "NEON SPLIT"]) assert.match(power, new RegExp(label));
+});
+
+test("welcome-back takeover displays time away and actual earned gases, including zero", () => {
+  const zero = renderToStaticMarkup(React.createElement(WelcomeBack, {
+    summary: { seconds: 1800, gain: plasma(0) }, onContinue() {},
+  }));
+  assert.match(zero, /aria-modal="true"/);
+  assert.match(zero, /WELCOME BACK/);
+  assert.match(zero, /30M/);
+  assert.match(zero, /NO PLASMA EARNED/);
+  const earned = renderToStaticMarkup(React.createElement(WelcomeBack, {
+    summary: { seconds: 3600, gain: { neon: 120, argon: 5, xenon: 0 } }, onContinue() {},
+  }));
+  assert.match(earned, /1H 0M/);
+  assert.match(earned, /\+120/);
+});
+
+test("stats distinguish cumulative time, active/online time, and capped time away", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const state = { ...freshSave(), activeSeconds: 3600, offlineSeconds: 7200 };
+  const html = renderToStaticMarkup(React.createElement(StatsPanel, {
+    state, unlockedGases: [gasById("neon")], rates: plasma(0),
+  }));
+  assert.match(html, /TOTAL PLAYTIME/);
+  assert.match(html, /ACTIVE ONLINE/);
+  assert.match(html, /OFFLINE PLAYTIME/);
+  assert.match(html, /3H 0M/);
+  assert.match(html, /2H 0M/);
+  assert.match(html, /1H 0M/);
 });

@@ -5,27 +5,28 @@
 import { useEffect, useRef, useState } from "react";
 import PlasmaBall from "./components/PlasmaBall";
 import CurrencyHeader from "./components/CurrencyHeader";
+import WelcomeBack, { type WelcomeSummary } from "./components/WelcomeBack";
 import UpgradePanel, { type UpTab } from "./components/UpgradePanel";
+import type { BuyQuantity } from "./components/UpgradeRow";
 import StatsPanel from "./components/StatsPanel";
 import OptionsPanel from "./components/OptionsPanel";
 import { GAS_LIST, gasById, nextGas } from "./game/gases";
-import { accrueIdle, bulkCost, buyMsg, cappedOfflineSeconds, cracklePower, idleRate, purchaseUpgrade } from "./game/economy";
+import { accrueIdle, accrueOffline, bulkCost, buyMsg, cappedOfflineSeconds, cracklePower, idleRate, purchaseUpgrade } from "./game/economy";
 import type { BuyKind } from "./game/economy";
 import { freshSave, loadOpts, loadSave, persist, resetSave, saveOpts } from "./game/save";
 import { measureTick } from "./game/timing";
-import { fmt } from "./utils/format";
 import { haptic } from "./utils/haptic";
-import type { GasId, GasRecord, GameState } from "./game/types";
+import type { GasId, GameState } from "./game/types";
 
 type Tab = "upgrades" | "stats" | "options";
 
 export default function App() {
   const [state, setState] = useState<GameState>(() => loadSave() ?? freshSave());
-  const [offlineGain, setOfflineGain] = useState<Partial<GasRecord> | null>(null);
+  const [welcome, setWelcome] = useState<WelcomeSummary | null>(null);
   const [saveWarning, setSaveWarning] = useState(false);
   const [tab, setTab] = useState<Tab>("upgrades");
   const [upTab, setUpTab] = useState<UpTab>("help");
-  const [qty, setQty] = useState<number | "max">(1);
+  const [quantities, setQuantities] = useState<Record<string, BuyQuantity>>({});
   const [scanlines, setScanlines] = useState(() => loadOpts().scan);
   const [buzz, setBuzz] = useState(() => loadOpts().buzz);
   const [toast, setToast] = useState<string | null>(null);
@@ -44,9 +45,8 @@ export default function App() {
     const saved = loadSave();
     if (!saved) return;
     const seconds = cappedOfflineSeconds(saved.lastSeen, Date.now());
-    const { gain } = accrueIdle(saved, seconds);
-    if (seconds > 0) setState((current) => accrueIdle(current, seconds).state);
-    if (seconds > 60 && GAS_LIST.some((g) => gain[g.id] > 1)) setOfflineGain(gain);
+    if (seconds > 0) setState((current) => accrueOffline(current, seconds).state);
+    if (seconds >= 10) setWelcome({ seconds, gain: accrueOffline(saved, seconds).gain });
   }, []);
 
   // Hidden tabs do not run the realtime tick. On resume settle one capped absence.
@@ -60,7 +60,8 @@ export default function App() {
         persist(stateRef.current);
       } else {
         const seconds = hiddenAt === null ? 0 : cappedOfflineSeconds(hiddenAt, now);
-        if (seconds > 0) setState((s) => accrueIdle(s, seconds).state);
+        if (seconds > 0) setState((s) => accrueOffline(s, seconds).state);
+        if (seconds >= 10) setWelcome({ seconds, gain: accrueOffline(stateRef.current, seconds).gain });
         hiddenAt = null;
         last = now;
       }
@@ -68,11 +69,14 @@ export default function App() {
     const timer = window.setInterval(() => {
       const now = Date.now();
       if (document.hidden) { last = now; return; }
-      const { incomeSeconds, activeSeconds } = measureTick(last, now);
+      const { incomeSeconds, activeSeconds, stalled } = measureTick(last, now);
       last = now;
       if (incomeSeconds <= 0) return;
+      if (stalled && incomeSeconds >= 10) {
+        setWelcome({ seconds: incomeSeconds, gain: accrueOffline(stateRef.current, incomeSeconds).gain });
+      }
       setState((s) => {
-        const credited = accrueIdle(s, incomeSeconds).state;
+        const credited = (stalled ? accrueOffline(s, incomeSeconds) : accrueIdle(s, incomeSeconds)).state;
         return activeSeconds > 0
           ? { ...credited, activeSeconds: s.activeSeconds + activeSeconds }
           : credited;
@@ -127,8 +131,8 @@ export default function App() {
     if (buzz) haptic(ms);
   };
 
-  const buy = (kind: BuyKind, gid?: GasId) => {
-    const want = kind === "gas" ? 1 : qty === "max" ? 1000 : qty;
+  const buy = (kind: BuyKind, gid?: GasId, quantity: BuyQuantity = 1) => {
+    const want = kind === "gas" ? 1 : quantity === "max" ? 1000 : quantity;
     const pre = bulkCost(stateRef.current, kind, gid, want);
     setState((s) => purchaseUpgrade(s, kind, gid, want).state);
     if (pre.count > 0) {
@@ -166,8 +170,6 @@ export default function App() {
     restoreScroll(viewKey("upgrades", next));
   };
 
-  const playSec = Math.floor(state.activeSeconds);
-
   return (
     <div className="flex h-screen h-dvh justify-center overflow-hidden bg-[#05030f] font-mono text-white select-none">
       <div className="relative flex h-full min-h-0 w-full max-w-[400px] flex-col bg-[#08041a]">
@@ -181,25 +183,12 @@ export default function App() {
           />
         )}
 
-        <CurrencyHeader state={state} gases={unlockedGases} rates={rates} qty={qty} onQtyChange={setQty} />
+        <CurrencyHeader state={state} gases={unlockedGases} rates={rates} />
 
         {saveWarning && (
           <div role="alert" className="border-b border-[#ffb86b]/40 bg-[#35200c] px-3 py-2 text-[11px] text-[#ffd8a4]">
             SAVE UNAVAILABLE — PROGRESS MAY BE LOST WHEN THIS TAB CLOSES.
           </div>
-        )}
-
-        {offlineGain !== null && (
-          <button
-            className="border-b-2 border-white/15 bg-[#1b1233] px-3 py-2 text-[11px] active:bg-[#241840]"
-            onClick={() => setOfflineGain(null)}
-          >
-            THE HELP KEPT PRESSING WHILE YOU WERE AWAY:{" "}
-            {(Object.entries(offlineGain) as [GasId, number][])
-              .map(([g, v]) => `${fmt(v)} ${gasById(g).name}`)
-              .join(" · ")}{" "}
-            — TAP TO DISMISS
-          </button>
         )}
 
         {/* the ball */}
@@ -244,11 +233,13 @@ export default function App() {
           <div ref={panelScrollRef} className="sekasma-scroll h-full overflow-y-auto overscroll-contain bg-[#0d0820] p-2">
           {tab === "upgrades" && (
             <UpgradePanel state={state} unlockedGases={unlockedGases} accent={accent}
-              upTab={upTab} onUpTabChange={switchUpgradeTab} qty={qty} onBuy={buy} />
+              upTab={upTab} onUpTabChange={switchUpgradeTab} quantities={quantities}
+              onQuantityChange={(key, quantity) => setQuantities((old) => ({ ...old, [key]: quantity }))}
+              onBuy={buy} />
           )}
 
           {tab === "stats" && (
-            <StatsPanel state={state} unlockedGases={unlockedGases} rates={rates} playSec={playSec} />
+            <StatsPanel state={state} unlockedGases={unlockedGases} rates={rates} />
           )}
           {tab === "options" && (
             <OptionsPanel
@@ -263,7 +254,8 @@ export default function App() {
                   const fresh = resetSave();
                   stateRef.current = fresh;
                   setState(fresh);
-                  setOfflineGain(null);
+                  setWelcome(null);
+                  setQuantities({});
                   setToast(null);
                   setConfirmReset(false);
                 } else setConfirmReset(true);
@@ -283,6 +275,7 @@ export default function App() {
           )}
         </div>
       </div>
+      {welcome && <WelcomeBack summary={welcome} onContinue={() => setWelcome(null)} />}
     </div>
   );
 }
