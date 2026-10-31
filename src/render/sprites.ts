@@ -65,6 +65,10 @@ export const GHOST_SPRITE = [
   "..111..",
   "...1...",
 ];
+export const STICKMAN_SPRITE = [
+  "..0....", ".010...", "..0.2..", ".1012..", "..0....", ".1.1...", "1...1..",
+];
+
 export function rotCW(s: string[]): string[] {
   const H = s.length;
   const W = s[0].length;

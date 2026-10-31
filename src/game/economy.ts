@@ -6,6 +6,7 @@ import { GAS_LIST, gasById, nextGas } from "./gases.ts";
 import {
   FIL_BASE,
   GHOST_MULT,
+  STICKMAN_MULT,
   MAX_VOLT_STEPS,
   MIX_LV,
   PRESS_INTERVAL,
@@ -26,6 +27,8 @@ export const fingerCost = (n: number, unlocked: GasId[]): Partial<GasRecord> => 
     c.argon = Math.ceil(3 * Math.pow(1.15, n));
   if (n >= MIX_LV.xenon && unlocked.includes("xenon"))
     c.xenon = Math.ceil(2 * Math.pow(1.12, n));
+  if (n >= MIX_LV.krypton && unlocked.includes("krypton"))
+    c.krypton = Math.ceil(Math.pow(1.1, n));
   return c;
 };
 export const toeCost = (n: number, unlocked: GasId[]): Partial<GasRecord> => {
@@ -34,10 +37,15 @@ export const toeCost = (n: number, unlocked: GasId[]): Partial<GasRecord> => {
     c.neon = Math.ceil(8 * Math.pow(1.15, n));
   if (n >= MIX_LV.xenon && unlocked.includes("xenon"))
     c.xenon = Math.ceil(4 * Math.pow(1.12, n));
+  if (n >= MIX_LV.krypton && unlocked.includes("krypton"))
+    c.krypton = Math.ceil(2 * Math.pow(1.1, n));
   return c;
 };
 export const ghostCost = (n: number): Partial<GasRecord> => ({
   xenon: Math.ceil(80 * Math.pow(1.45, n)),
+});
+export const stickmanCost = (n: number): Partial<GasRecord> => ({
+  krypton: Math.ceil(120 * Math.pow(1.5, n)),
 });
 export const splitCost = (g: GasId, n: number): Partial<GasRecord> => ({
   [g]: Math.ceil(SPLIT_BASE[g] * Math.pow(2.2, n)),
@@ -59,7 +67,7 @@ export const idleRate = (s: GameState): GasRecord => {
   for (const g of GAS_LIST) {
     if (!s.unlocked.includes(g.id)) continue;
     out[g.id] =
-      ((s.fingers + s.toes * TOE_MULT + s.ghosts * GHOST_MULT) * cracklePower(g, s)) /
+      ((s.fingers + s.toes * TOE_MULT + s.ghosts * GHOST_MULT + s.stickmen * STICKMAN_MULT) * cracklePower(g, s)) /
       PRESS_INTERVAL;
   }
   return out;
@@ -73,7 +81,7 @@ export const pay = (s: GameState, cost: Partial<GasRecord>) => {
 };
 
 // ---------- Bulk buying (1 / 5 / 10 / 100 / MAX) ----------
-export type BuyKind = "finger" | "toe" | "ghost" | "filament" | "voltage" | "split" | "gas";
+export type BuyKind = "finger" | "toe" | "ghost" | "stickman" | "filament" | "voltage" | "split" | "gas";
 
 export const addCosts = (a: Partial<GasRecord>, b: Partial<GasRecord>): Partial<GasRecord> => {
   const out: Partial<GasRecord> = { ...a };
@@ -94,6 +102,7 @@ export const bulkCost = (
     if (kind === "finger") c = fingerCost(s.fingers + n, s.unlocked);
     if (kind === "toe") c = toeCost(s.toes + n, s.unlocked);
     if (kind === "ghost") c = ghostCost(s.ghosts + n);
+    if (kind === "stickman") c = stickmanCost(s.stickmen + n);
     if (kind === "filament" && gid)
       c = s.filaments[gid] + n >= gasById(gid).cap ? null : filamentCost(gid, s.filaments[gid] + n);
     if (kind === "voltage" && gid)
@@ -116,6 +125,7 @@ export function peekCost(s: GameState, kind: BuyKind, gid?: GasId): Partial<GasR
   if (kind === "finger") return fingerCost(s.fingers, s.unlocked);
   if (kind === "toe") return toeCost(s.toes, s.unlocked);
   if (kind === "ghost") return ghostCost(s.ghosts);
+  if (kind === "stickman") return stickmanCost(s.stickmen);
   if (kind === "filament" && gid)
     return s.filaments[gid] >= gasById(gid).cap ? {} : filamentCost(gid, s.filaments[gid]);
   if (kind === "voltage" && gid)
@@ -131,6 +141,7 @@ export function buyMsg(kind: BuyKind, gid: GasId | undefined, n: number): string
   if (kind === "finger") return `+${n} ${s("FINGER")} HIRED`;
   if (kind === "toe") return n > 1 ? `+${n} FEET HIRED` : "+1 FOOT HIRED";
   if (kind === "ghost") return n > 1 ? `+${n} GHOST HANDS` : "+1 GHOST HAND";
+  if (kind === "stickman") return n > 1 ? `+${n} STICKMEN` : "+1 STICKMAN";
   if (kind === "filament") return `+${n} ${gasById(gid!).name} ${s("ARC")}`;
   if (kind === "voltage") return `+${n} ${s("VOLT STEP")}`;
   return `+${n} ${s("BRANCH")}`;
@@ -184,6 +195,7 @@ export function purchaseUpgrade(
   if (kind === "finger") next.fingers = s.fingers + count;
   if (kind === "toe") next.toes = s.toes + count;
   if (kind === "ghost") next.ghosts = s.ghosts + count;
+  if (kind === "stickman") next.stickmen = s.stickmen + count;
   if (kind === "filament" && gid)
     next.filaments = { ...s.filaments, [gid]: s.filaments[gid] + count };
   if (kind === "voltage" && gid)

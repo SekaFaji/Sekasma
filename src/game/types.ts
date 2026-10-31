@@ -2,7 +2,7 @@
  * Core domain types: the three gas currencies and the save-state shape.
  */
 
-export type GasId = "neon" | "argon" | "xenon";
+export type GasId = "neon" | "argon" | "xenon" | "krypton";
 
 export type Gas = {
   id: GasId;
@@ -24,6 +24,7 @@ export type GameState = {
   fingers: number;
   toes: number;
   ghosts: number;
+  stickmen: number;
   filaments: GasRecord; // arcs are per-gas
   splits: GasRecord; // string split branches per gas
   unlocked: GasId[];
