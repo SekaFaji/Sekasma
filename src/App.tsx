@@ -16,7 +16,7 @@ import type { BuyKind } from "./game/economy";
 import { freshSave, loadOpts, loadSave, persist, resetSave, saveOpts } from "./game/save";
 import { measureTick } from "./game/timing";
 import { haptic } from "./utils/haptic";
-import type { GasId, GasRecord, GameState } from "./game/types";
+import type { GasId, GameState } from "./game/types";
 
 type Tab = "upgrades" | "stats" | "options";
 

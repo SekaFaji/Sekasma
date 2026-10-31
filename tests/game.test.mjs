@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { accrueIdle, bulkCost, cappedOfflineSeconds, fingerCost, purchaseUpgrade } from "../src/game/economy.ts";
+import { accrueIdle, accrueOffline, bulkCost, cappedOfflineSeconds, fingerCost, purchaseUpgrade } from "../src/game/economy.ts";
 import { OFFLINE_CAP_S } from "../src/game/config.ts";
 import { BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
 import { measureTick } from "../src/game/timing.ts";
@@ -174,4 +174,24 @@ test("unavailable storage is reported and reset stays safe in memory", () => {
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;
   }
+});
+
+test("offline time is tracked even with zero earnings and is capped", () => {
+  const start = freshSave();
+  const { state, gain } = accrueOffline(start, 86400);
+  assert.equal(gain.neon, 0);
+  assert.equal(state.offlineSeconds, OFFLINE_CAP_S);
+  assert.equal(state.activeSeconds, 0);
+  assert.equal(start.offlineSeconds, 0);
+  const withHelpers = accrueOffline({ ...start, fingers: 1, offlineSeconds: 12 }, 60);
+  assert.equal(withHelpers.state.offlineSeconds, 72);
+  assert.ok(withHelpers.gain.neon > 0);
+});
+
+test("legacy save migration initializes offline time safely", () => {
+  const oldSave = { ...freshSave(), v: 12, offlineSeconds: undefined, activeSeconds: 120 };
+  const migrated = migrateSave(oldSave);
+  assert.equal(migrated.activeSeconds, 120);
+  assert.equal(migrated.offlineSeconds, 0);
+  assert.equal(migrateSave({ ...freshSave(), v: 13, offlineSeconds: -50 }).offlineSeconds, 0);
 });

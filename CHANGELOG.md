@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.12 - Welcome Back, playtime statistics and compact purchasing
+
+- Full-screen Welcome Back summary shows time away and actual per-gas earnings, including zero-income returns
+- Track capped background time separately from foreground active time, with migration of older saves (schema v13)
+- Stats now distinguish TOTAL PLAYTIME, ACTIVE ONLINE and OFFLINE PLAYTIME (historical offline hours unavailable)
+- Give BUY and LOCKED actions a fixed 65px width; show green percentage progress inside locked actions
+- Move independent x1/x5/x10/x100/MAX controls next to each repeatable upgrade's BUY action
+- Rename header to SEKASMA, remove helper counts and use a compact scrolling currency rail for future growth
+- Keep existing economy, caps, rewards, upgrade categories and sprites unchanged
+
+
 ## 0.12.11 - Compact UI correction
 
 - Move x1/x5/x10/x100/MAX bulk buying to one compact BUY dropdown in the top status header

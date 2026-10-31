@@ -96,6 +96,9 @@ The repository contains an npm-generated `package-lock.json` (lockfile v3). Use 
 
 ## Mobile browser smoke test
 
+Check the full-screen Welcome Back after leaving the app for at least 10 seconds; verify displayed earnings and that returning without helpers still reports zero. Verify Stats' active, offline and combined totals; offline history from versions older than 0.12.12 cannot be reconstructed. On every repeatable upgrade, test the independent 1/5/10/100/MAX controls immediately before the fixed-width BUY action. Locked rows use the same width and contain a green unlock-progress percentage. The SEKASMA currency rail must scroll sideways when many gases are present. **Active online** means visible foreground gameplay, not an internet connection.
+
+
 Check that the small BUY dropdown in the top bar still offers x1/x5/x10/x100/MAX and affects purchases in HELP/POWER. All HELP/GAS/POWER upgrade rows and next-price chips remain present. Verify each tab remembers its scroll position, and that only genuine gas-gated helpers show LOCKED. These layout changes still require physical-phone verification.
 
 
