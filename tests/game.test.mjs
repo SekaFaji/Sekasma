@@ -29,7 +29,7 @@ test("idle earnings are capped and immutable", () => {
 });
 
 test("bulk purchases charge successive levels and do not mutate inputs", () => {
-  const initial = { ...freshSave(), plasma: { neon: 1000, argon: 0, xenon: 0 } };
+  const initial = { ...freshSave(), plasma: { neon: 1000, argon: 0, xenon: 0, krypton: 0 } };
   const quote = bulkCost(initial, "finger", undefined, 5);
   assert.equal(quote.count, 5);
   const expected = Array.from({ length: 5 }, (_, i) => fingerCost(i, ["neon"]).neon ?? 0)
@@ -49,7 +49,7 @@ test("unaffordable purchases return the exact original state", () => {
 });
 
 test("gas unlock costs are charged once", () => {
-  const initial = { ...freshSave(), plasma: { neon: 600, argon: 0, xenon: 0 } };
+  const initial = { ...freshSave(), plasma: { neon: 600, argon: 0, xenon: 0, krypton: 0 } };
   const { state, count } = purchaseUpgrade(initial, "gas", undefined, 100);
   assert.equal(count, 1);
   assert.deepEqual(state.unlocked, ["neon", "argon"]);
@@ -59,10 +59,10 @@ test("gas unlock costs are charged once", () => {
 test("legacy save validation prevents invalid currencies and progression", () => {
   const state = migrateSave({
     ...freshSave(), v: 11, activeSeconds: -50,
-    plasma: { neon: -100, argon: Infinity, xenon: 3 },
-    voltage: { neon: 999999999, argon: -7, xenon: 0 },
-    filaments: { neon: 999, argon: 1, xenon: 0 },
-    splits: { neon: 999, argon: 0, xenon: 0 },
+    plasma: { neon: -100, argon: Infinity, xenon: 3, krypton: 2 },
+    voltage: { neon: 999999999, argon: -7, xenon: 0, krypton: 0 },
+    filaments: { neon: 999, argon: 1, xenon: 0, krypton: 0 },
+    splits: { neon: 999, argon: 0, xenon: 0, krypton: 0 },
     unlocked: ["xenon", "not-a-gas"],
   });
   assert.deepEqual(state.unlocked, ["neon"]);
@@ -90,6 +90,7 @@ test("visual helper caps never limit economy ownership or income", () => {
   assert.equal(visibleHelperCount(s.fingers, "fingers"), 20);
   assert.equal(visibleHelperCount(s.toes, "toes"), 12);
   assert.equal(visibleHelperCount(s.ghosts, "ghosts"), 10);
+  assert.equal(visibleHelperCount(10, "stickmen"), 6);
   assert.equal(visibleHelperCount(-10, "fingers"), 0);
 });
 
@@ -194,4 +195,37 @@ test("legacy save migration initializes offline time safely", () => {
   assert.equal(migrated.activeSeconds, 120);
   assert.equal(migrated.offlineSeconds, 0);
   assert.equal(migrateSave({ ...freshSave(), v: 13, offlineSeconds: -50 }).offlineSeconds, 0);
+});
+
+test("Krypton unlocks after Xenon and Stickmen purchase safely", () => {
+  const s = freshSave();
+  s.unlocked = ["neon", "argon", "xenon"];
+  s.plasma.xenon = 40000;
+  const gas = purchaseUpgrade(s, "gas", undefined, 1);
+  assert.equal(gas.count, 1);
+  assert.deepEqual(gas.state.unlocked, ["neon", "argon", "xenon", "krypton"]);
+  assert.equal(gas.state.plasma.xenon, 0);
+  const available = { ...gas.state, plasma: { ...gas.state.plasma, krypton: 200 } };
+  const purchased = purchaseUpgrade(available, "stickman", undefined, 1);
+  assert.equal(purchased.count, 1);
+  assert.equal(purchased.state.stickmen, 1);
+  assert.ok(purchased.state.plasma.krypton < 200);
+  assert.equal(available.stickmen, 0);
+  assert.ok(accrueIdle(purchased.state, 10).gain.neon > accrueIdle({ ...purchased.state, stickmen: 0 }, 10).gain.neon);
+});
+
+test("v13 save migrations preserve old progress and add Krypton and Stickmen", () => {
+  const old = freshSave();
+  delete old.plasma.krypton;
+  delete old.total.krypton;
+  delete old.voltage.krypton;
+  delete old.filaments.krypton;
+  delete old.splits.krypton;
+  delete old.stickmen;
+  const result = migrateSave({ ...old, v: 13, fingers: 9, activeSeconds: 3600 });
+  assert.equal(result.fingers, 9);
+  assert.equal(result.activeSeconds, 3600);
+  assert.equal(result.stickmen, 0);
+  assert.equal(result.plasma.krypton, 0);
+  assert.deepEqual(result.unlocked, ["neon"]);
 });

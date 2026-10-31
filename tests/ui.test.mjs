@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
 import { affordabilityPercent } from "../src/utils/progress.ts";
 
-const plasma = (neon) => ({ neon, argon: 0, xenon: 0 });
+const plasma = (neon) => ({ neon, argon: 0, xenon: 0, krypton: 0 });
 let server;
 let UpgradeRow;
 let App;
@@ -28,7 +28,7 @@ before(async () => {
 after(async () => { if (server) await server.close(); });
 
 test("mixed gas prices use the least-funded requirement", () => {
-  assert.equal(affordabilityPercent({ neon: 100, argon: 20 }, { neon: 80, argon: 5, xenon: 0 }), 25);
+  assert.equal(affordabilityPercent({ neon: 100, argon: 20 }, { neon: 80, argon: 5, xenon: 0, krypton: 0 }), 25);
   assert.equal(affordabilityPercent({ neon: 100 }, plasma(50)), 50);
   assert.equal(affordabilityPercent({ neon: 100 }, plasma(1000)), 100);
   assert.equal(affordabilityPercent({ neon: 100 }, plasma(0)), 0);
@@ -54,7 +54,7 @@ test("gas-locked upgrade uses a locked label without a useless 0% bar", () => {
   assert.match(html, /LOCKED/);
   assert.match(html, /role="progressbar"/);
   assert.match(html, /aria-valuenow="35"/);
-  assert.ok(html.includes("w-[65px]"));
+  assert.ok(html.includes("w-[78px]"));
 });
 
 test("affordable upgrades keep a readable price without progress bars", () => {
@@ -112,13 +112,13 @@ test("upgrade category tabs expose their selected states", async () => {
 test("currency header keeps gas totals in distinct, wrapping cards", async () => {
   const { freshSave } = await import("../src/game/save.ts");
   const { GAS_LIST } = await import("../src/game/gases.ts");
-  const state = { ...freshSave(), unlocked: ["neon", "argon", "xenon"] };
+  const state = { ...freshSave(), unlocked: ["neon", "argon", "xenon", "krypton"] };
   const html = renderToStaticMarkup(React.createElement(CurrencyHeader, {
-    state, gases: GAS_LIST, rates: { neon: 0, argon: 0, xenon: 0 },
+    state, gases: GAS_LIST, rates: { neon: 0, argon: 0, xenon: 0, krypton: 0 },
   }));
   assert.match(html, /sekasma-currency-rail/);
-  assert.equal((html.match(/role="listitem"/g) ?? []).length, 3);
-  for (const name of ["NEON", "ARGON", "XENON"]) assert.match(html, new RegExp(name));
+  assert.equal((html.match(/role="listitem"/g) ?? []).length, 4);
+  for (const name of ["NEON", "ARGON", "XENON", "KRYPTON"]) assert.match(html, new RegExp(name));
   assert.match(html, /aria-label="Gas balances"/);
   assert.doesNotMatch(html, /Bulk buy quantity/);
   assert.doesNotMatch(html, /truncate/);
@@ -147,7 +147,7 @@ test("every repeatable upgrade exposes per-row quantity choices and a fixed BUY 
     assert.ok(html.includes(label), label);
   }
   assert.match(html, /aria-pressed="true"/);
-  assert.ok(html.includes('w-[65px]'));
+  assert.ok(html.includes('w-[78px]'));
   const header = renderToStaticMarkup(React.createElement(CurrencyHeader, {
     state, gases: [gasById("neon")], rates: plasma(0),
   }));
@@ -173,7 +173,7 @@ test("original HELP, GAS and POWER upgrades remain visible", async () => {
   const help = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "help" }));
   const gas = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "gas" }));
   const power = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "power" }));
-  for (const label of ["FINGER", "BIG TOE", "GHOST HAND"]) assert.match(help, new RegExp(label));
+  for (const label of ["FINGER", "BIG TOE", "GHOST HAND", "STICKMAN"]) assert.match(help, new RegExp(label));
   assert.match(gas, /ARGON GAS/);
   for (const label of ["NEON ARC", "NEON VOLTS", "NEON SPLIT"]) assert.match(power, new RegExp(label));
 });
@@ -187,7 +187,7 @@ test("welcome-back takeover displays time away and actual earned gases, includin
   assert.match(zero, /30M/);
   assert.match(zero, /NO PLASMA EARNED/);
   const earned = renderToStaticMarkup(React.createElement(WelcomeBack, {
-    summary: { seconds: 3600, gain: { neon: 120, argon: 5, xenon: 0 } }, onContinue() {},
+    summary: { seconds: 3600, gain: { neon: 120, argon: 5, xenon: 0, krypton: 0 } }, onContinue() {},
   }));
   assert.match(earned, /1H 0M/);
   assert.match(earned, /\+120/);
@@ -206,4 +206,27 @@ test("stats distinguish cumulative time, active/online time, and capped time awa
   assert.match(html, /3H 0M/);
   assert.match(html, /2H 0M/);
   assert.match(html, /1H 0M/);
+});
+
+test("purchase buttons show their gas price under BUY", () => {
+  const markup = renderToStaticMarkup(React.createElement(UpgradeRow, {
+    name: "FINGER", sub: "WORKER", cost: { neon: 50, argon: 10 },
+    icon: "F", onBuy() {}, disabled: false, plasma: plasma(100),
+  }));
+  assert.match(markup, /<button[^>]*aria-label="Buy FINGER"[^>]*>/);
+  assert.match(markup, /BUY/);
+  assert.match(markup, /50N/);
+  assert.match(markup, /10A/);
+  assert.ok(markup.includes('w-[78px]'));
+});
+
+test("boxed stats include Stickman helper counts", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const html = renderToStaticMarkup(React.createElement(StatsPanel, {
+    state: { ...freshSave(), stickmen: 3 },
+    unlockedGases: [gasById("neon")], rates: plasma(0),
+  }));
+  assert.match(html, /STICKMEN/);
+  assert.match(html, /KRYPTON HELPER/);
 });
