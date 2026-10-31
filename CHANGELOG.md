@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.16 — Compact four-column Stats, community links, maxed upgrades
+
+- Group general counters under a titled GENERAL STATS section matching each gas's own category
+- Display four compact stat boxes per row on phones, in General and per-gas sections
+- Add GitHub, SekaFaji Games Discord and YouTube community links in Options from the published SekaFaji profile
+- Open external links in a separate browser tab with noopener/noreferrer protection
+- Hide x1/x5/x10/x100/MAX controls when a purchase is genuinely capped; keep them on unaffordable upgrades
+- Keep upgrade economy, owned quantities, save data and existing layouts unchanged
+- Add rendered UI regression tests for grouping, actual links, and maxed-versus-unaffordable behavior
+
+
 ## 0.12.15 — Four visible helpers, individual power and gas-bolt prices
 
 - Fit all four HELP upgrade rows together on typical Android phone screens with shorter, stable row heights and a HELP-specific panel height

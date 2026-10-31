@@ -48,7 +48,7 @@ export default function UpgradeRow({
             <UnlockBar cost={price} color={color ?? "#b7b2ff"} plasma={plasma} label={name} />}
         </div>
       </div>
-      {onQtyChange && quantity !== undefined && !locked && (
+      {onQtyChange && quantity !== undefined && !locked && !capped && (
         <div role="group" aria-label={`${name} quantity`} className="flex shrink-0 items-center gap-0.5">
           {BUY_QUANTITIES.map((value) => (
             <button key={String(value)} type="button" aria-pressed={quantity === value}

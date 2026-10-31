@@ -1,4 +1,9 @@
-/** Accessible preference switches and a deliberate, cancellable save reset. */
+/** Accessible preference switches, community links and a cancellable save reset. */
+const COMMUNITY_LINKS = [
+  { label: "GITHUB", detail: "SekaFaji projects", href: "https://github.com/SekaFaji" },
+  { label: "DISCORD", detail: "SekaFaji Games community", href: "https://discord.gg/794QQWJEeP" },
+  { label: "YOUTUBE", detail: "SekaFaji Games channel", href: "https://youtube.com/@sekafajigames" },
+] as const;
 export default function OptionsPanel({
   scanlines, buzz, confirmReset, onToggleScanlines, onToggleBuzz, onReset, onCancelReset,
 }: {
@@ -34,6 +39,21 @@ export default function OptionsPanel({
           {buzz ? "ON" : "OFF"}
         </span>
       </button>
+      <section aria-labelledby="community-links-heading" className="border border-white/20 bg-[#120c26] p-2">
+        <h3 id="community-links-heading" className="mb-2 text-[11px] font-bold tracking-widest text-[#c9b1f4]">
+          COMMUNITY
+        </h3>
+        <div className="grid grid-cols-1 gap-1.5">
+          {COMMUNITY_LINKS.map(link => (
+            <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer"
+              className="flex min-h-[44px] items-center justify-between gap-2 border border-white/25 bg-[#1b1233] px-2 py-1 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#b7b2ff] active:translate-y-[1px]">
+              <span className="font-bold">{link.label}</span>
+              <span className="min-w-0 truncate text-right text-[10px] text-white/65">{link.detail}</span>
+              <span aria-hidden="true" className="shrink-0 text-white/55">↗</span>
+            </a>
+          ))}
+        </div>
+      </section>
       {confirmReset ? (
         <div role="group" aria-label="Confirm reset" className="border border-[#ff5ec8]/60 bg-[#2a1233] p-2">
           <p className="mb-2 text-[11px] leading-relaxed text-white/85">
