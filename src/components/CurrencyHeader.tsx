@@ -15,11 +15,11 @@ export default function CurrencyHeader({ state, gases, rates }: {
             className="w-[94px] min-w-[94px] shrink-0 border bg-[#0d0820] px-1.5 py-0.5"
             style={{ borderColor: `${gas.color}55` }}>
             <div className="flex min-w-0 items-baseline justify-between gap-1">
-              <span className="truncate text-[9px] font-bold" style={{ color: gas.color }}>{gas.name}</span>
-              <span className="min-w-0 truncate text-[10px] font-bold tabular-nums"
+              <span className="text-[9px] font-bold" style={{ color: gas.color }}>{gas.name}</span>
+              <span className="min-w-0 text-[10px] font-bold tabular-nums"
                 style={{ color: gas.color }} title={String(state.plasma[gas.id])}>{fmt(state.plasma[gas.id])}</span>
             </div>
-            <div className="truncate text-[9px] leading-tight tabular-nums text-white/65">
+            <div className="text-[9px] leading-tight tabular-nums text-white/65">
               {fmt(cracklePower(gas, state))}/T · {fmt(rates[gas.id])}/S
             </div>
           </div>
