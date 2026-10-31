@@ -99,3 +99,19 @@ html, body, #root {
 @media (prefers-reduced-motion: reduce) {
   .sekasma-pixel-orb, .sekasma-pixel-spark { animation: none; }
 }
+
+/* On phones, reserve enough panel height for ALL FOUR compact helper upgrades.
+   Other tabs retain their existing, balanced screen proportions. */
+.sekasma-panel-shell--help {
+  height: min(48vh, 390px);
+  height: min(48dvh, 390px);
+}
+@media (max-height: 640px) {
+  .sekasma-panel-shell--help {
+    height: min(54vh, 320px);
+    height: min(54dvh, 320px);
+  }
+}
+/* Two lines of detail and a permanent slim progress lane prevent row wobble. */
+.sekasma-upgrade-sub { line-height: 10px; }
+.sekasma-price-grid { font-variant-numeric: tabular-nums; }

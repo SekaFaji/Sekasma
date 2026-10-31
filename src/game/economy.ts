@@ -5,15 +5,13 @@
 import { GAS_LIST, gasById, nextGas } from "./gases.ts";
 import {
   FIL_BASE,
-  GHOST_MULT,
-  STICKMAN_MULT,
+  HELPER_POWER,
   MAX_VOLT_STEPS,
   MIX_LV,
   PRESS_INTERVAL,
   OFFLINE_CAP_S,
   SPLIT_BASE,
   SPLIT_CAP,
-  TOE_MULT,
   VOLT_BASE,
   splitMult,
   voltMult,
@@ -67,7 +65,8 @@ export const idleRate = (s: GameState): GasRecord => {
   for (const g of GAS_LIST) {
     if (!s.unlocked.includes(g.id)) continue;
     out[g.id] =
-      ((s.fingers + s.toes * TOE_MULT + s.ghosts * GHOST_MULT + s.stickmen * STICKMAN_MULT) * cracklePower(g, s)) /
+      ((s.fingers * HELPER_POWER.finger + s.toes * HELPER_POWER.toe +
+        s.ghosts * HELPER_POWER.ghost + s.stickmen * HELPER_POWER.stickman) * cracklePower(g, s)) /
       PRESS_INTERVAL;
   }
   return out;
