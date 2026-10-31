@@ -96,6 +96,9 @@ The repository contains an npm-generated `package-lock.json` (lockfile v3). Use 
 
 ## Mobile browser smoke test
 
+For v0.12.15, open HELP on Android with all four gases unlocked. Verify FINGER, BIG TOE, GHOST HAND and STICKMAN cards appear together in the bottom panel, and each reads POWER (1, 8, 20 or 45) instead of "x FINGER". On upgrades with mixed costs, confirm NEON's pink bolt, ARGON's purple-blue bolt, XENON's cyan bolt and KRYPTON's gold bolt all fit INSIDE their BUY button as two neat columns. Prices use the existing cost calculations; the static helper power numbers preserve previous earnings. Small-height browser layouts still permit scrolling when necessary.
+
+
 In v0.12.14, confirm upgrade-row heights do **not** move when an affordability percentage appears/disappears. The new pixel-drawn SEKASMA plasma logo is reused on Welcome Back. The ball and its stepped stand should be larger, with roaming and jumping Stickmen briefly cracking the glass. Even with hundreds of owned helpers, at most 12 are drawn simultaneously (income still uses all owned helpers). For short Android displays, verify the controls remain usable and the canvas remains square.
 
 

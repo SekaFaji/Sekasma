@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { accrueIdle, accrueOffline, bulkCost, cappedOfflineSeconds, fingerCost, purchaseUpgrade } from "../src/game/economy.ts";
-import { OFFLINE_CAP_S } from "../src/game/config.ts";
+import { OFFLINE_CAP_S, HELPER_POWER, PRESS_INTERVAL } from "../src/game/config.ts";
 import { BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
 import { measureTick } from "../src/game/timing.ts";
 import { visibleHelperCount, visibleHelperCounts, MAX_VISIBLE_HELPERS } from "../src/render/limits.ts";
@@ -255,4 +255,22 @@ test("Stickmen move around the orb, jump, then strike exactly once per leap", ()
   assert.ok(framesInAir >= 5);
   assert.ok(walking);
   assert.ok(strikes >= 2 && strikes <= 4);
+});
+
+test("helper types have independent fixed power values, not finger-owned scaling", () => {
+  const { neon: neonGas } = { neon: { baseRate: 0.1 } };
+  const base = freshSave();
+  const helpers = [
+    ["fingers", "finger", 1], ["toes", "toe", 8],
+    ["ghosts", "ghost", 20], ["stickmen", "stickman", 45],
+  ];
+  for (const [field, key, power] of helpers) {
+    assert.equal(HELPER_POWER[key], power);
+    const state = { ...base, [field]: 1 };
+    assert.ok(Math.abs(accrueIdle(state, PRESS_INTERVAL).gain.neon - neonGas.baseRate * power) < 1e-9);
+    const after = { ...state, fingers: field === "fingers" ? 1 : 777 };
+    const contribution = accrueIdle(after, PRESS_INTERVAL).gain.neon -
+      accrueIdle({ ...after, [field]: 0 }, PRESS_INTERVAL).gain.neon;
+    assert.ok(Math.abs(contribution - neonGas.baseRate * power) < 1e-9);
+  }
 });
