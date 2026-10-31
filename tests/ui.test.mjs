@@ -12,6 +12,7 @@ let App;
 let OptionsPanel;
 let UpgradePanel;
 let CurrencyHeader;
+let SekasmaLogo;
 let WelcomeBack;
 let StatsPanel;
 
@@ -22,6 +23,7 @@ before(async () => {
   ({ default: OptionsPanel } = await server.ssrLoadModule("/src/components/OptionsPanel.tsx"));
   ({ default: UpgradePanel } = await server.ssrLoadModule("/src/components/UpgradePanel.tsx"));
   ({ default: CurrencyHeader } = await server.ssrLoadModule("/src/components/CurrencyHeader.tsx"));
+  ({ default: SekasmaLogo } = await server.ssrLoadModule("/src/components/SekasmaLogo.tsx"));
   ({ default: WelcomeBack } = await server.ssrLoadModule("/src/components/WelcomeBack.tsx"));
   ({ default: StatsPanel } = await server.ssrLoadModule("/src/components/StatsPanel.tsx"));
 });
@@ -229,4 +231,28 @@ test("boxed stats include Stickman helper counts", async () => {
   }));
   assert.match(html, /STICKMEN/);
   assert.match(html, /KRYPTON HELPER/);
+});
+
+test("affordability progress uses an identical fixed-size slot across affordability changes", () => {
+  const props = { name: "FINGER", sub: "FINGER STRENGTH", icon: "F", cost: { neon: 50 },
+    nextCost: { neon: 50 }, onBuy() {}, plasma: plasma(30) };
+  const poor = renderToStaticMarkup(React.createElement(UpgradeRow, { ...props, disabled: true }));
+  const rich = renderToStaticMarkup(React.createElement(UpgradeRow, { ...props, disabled: false }));
+  for (const markup of [poor, rich]) {
+    assert.ok(markup.includes('h-[66px]'));
+    assert.ok(markup.includes('h-[12px]'));
+    assert.ok(markup.includes('sekasma-upgrade-sub'));
+  }
+  assert.match(poor, /role="progressbar"/);
+  assert.doesNotMatch(rich, /role="progressbar"/);
+});
+
+test("SEKASMA logo is pixel-drawn and keeps the Welcome Back mark reusable", () => {
+  const logo = renderToStaticMarkup(React.createElement(SekasmaLogo));
+  const big = renderToStaticMarkup(React.createElement(SekasmaLogo, { big: true }));
+  assert.match(logo, /shape-rendering="crispEdges"/);
+  assert.match(logo, /SEKASMA/);
+  assert.match(big, /sekasma-pixel-logo-large/);
+  assert.ok((logo.match(/<rect/g) ?? []).length > 70);
+  assert.doesNotMatch(logo, /⚡/);
 });

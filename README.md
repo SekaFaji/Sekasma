@@ -96,6 +96,9 @@ The repository contains an npm-generated `package-lock.json` (lockfile v3). Use 
 
 ## Mobile browser smoke test
 
+In v0.12.14, confirm upgrade-row heights do **not** move when an affordability percentage appears/disappears. The new pixel-drawn SEKASMA plasma logo is reused on Welcome Back. The ball and its stepped stand should be larger, with roaming and jumping Stickmen briefly cracking the glass. Even with hundreds of owned helpers, at most 12 are drawn simultaneously (income still uses all owned helpers). For short Android displays, verify the controls remain usable and the canvas remains square.
+
+
 In version 0.12.13, check centered animated electric branding in the header and Welcome Back, boxed Stats, and prices displayed beneath BUY in the same-width BUY/LOCKED controls. Unlock Krypton after Xenon and purchase a Stickman; its hit should briefly crack and then repair the plasma glass. Confirm the larger stand is visible, and existing saves retain their helper and gas progress.
 
 

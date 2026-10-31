@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.14 — Stable upgrades, plasma pixel logo and animated Stickmen
+
+- Give upgrade rows and their subtitle/progress slots fixed height so affordability bars never shift adjacent items
+- Replace text-and-emoji branding with a reusable, crisp pixel-art plasma-orb emblem and custom SEKASMA glyphs
+- Animate pixel sparks subtly and respect reduced-motion preferences
+- Increase the plasma orb radius, displayed canvas area and stepped pedestal while preserving the responsive layout
+- Make Stickmen orbit the sphere, jump toward it, swing and strike with brief self-repairing glass-crack effects
+- Reduce per-helper screen limits and cap all visible helpers to a shared budget of 12; existing purchases and idle income stay unchanged
+- Add renderer-state, visual-count and React component regression coverage
+
+
 ## 0.12.13 — Electric branding, compact prices, Krypton and Stickman
 
 - Center the SEKASMA logo, animate subtle electric bolts, and reuse the mark on Welcome Back
