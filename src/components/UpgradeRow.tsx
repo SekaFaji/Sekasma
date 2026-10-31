@@ -28,14 +28,16 @@ export default function UpgradeRow({
   const progress = locked && plasma && unlockCost ? affordabilityPercent(unlockCost, plasma) : 0;
   const capped = !locked && disabled && Object.keys(price).length === 0;
   return (
-    <div className="flex min-h-[54px] w-full items-center gap-1.5 border border-white/15 bg-[#130c29] px-1.5 py-1">
+    <div className="flex h-[66px] w-full shrink-0 items-center gap-1.5 border border-white/15 bg-[#130c29] px-1.5 py-1">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/15 bg-[#0b0618]">{icon}</div>
-      <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-bold leading-tight" style={color ? { color } : undefined}>{name}</div>
-        <div className="mt-0.5 text-[9px] leading-tight text-white/70">{sub}</div>
-        {!locked && disabled && !capped && plasma && (
-          <UnlockBar cost={price} color={color ?? "#b7b2ff"} plasma={plasma} label={name} />
-        )}
+      <div className="flex h-[52px] min-w-0 flex-1 flex-col justify-center">
+        <div className="shrink-0 truncate text-[11px] font-bold leading-tight" style={color ? { color } : undefined}>{name}</div>
+        <div className="sekasma-upgrade-sub mt-0.5 h-[24px] shrink-0 text-[9px] leading-3 text-white/70">{sub}</div>
+        {/* Always reserve exactly the same progress slot, even when affordable or maxed. */}
+        <div className="h-[12px] min-h-[12px] shrink-0">
+          {!locked && disabled && !capped && plasma &&
+            <UnlockBar cost={price} color={color ?? "#b7b2ff"} plasma={plasma} label={name} />}
+        </div>
       </div>
       {onQtyChange && quantity !== undefined && !locked && (
         <div role="group" aria-label={`${name} quantity`} className="flex shrink-0 items-center gap-0.5">

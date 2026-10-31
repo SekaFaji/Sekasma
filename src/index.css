@@ -27,12 +27,12 @@ html, body, #root {
    cqh is the actual height left after the header, controls and upgrade panel. */
 .sekasma-ball-area { container-type: size; }
 .sekasma-ball-canvas {
-  width: min(100%, 30vh, 240px);
-  width: min(100%, 30dvh, 240px);
+  width: min(100%, 39vh, 300px);
+  width: min(100%, 39dvh, 300px);
   height: auto;
 }
 @supports (width: 1cqh) {
-  .sekasma-ball-canvas { width: min(100cqw, 100cqh, 240px); }
+  .sekasma-ball-canvas { width: min(100cqw, 100cqh, 300px); }
 }
 /* Older mobile browsers use vh; modern browsers use the visible viewport. */
 .sekasma-panel-shell {
@@ -67,4 +67,35 @@ html, body, #root {
 .sekasma-logo-volts-delay { animation-delay: .25s; }
 @media (prefers-reduced-motion: reduce) {
   .sekasma-logo, .sekasma-logo-volts { animation: none; }
+}
+
+/* Stable 2-line subtitle & immutable progress slot: affordability cannot shift rows. */
+.sekasma-upgrade-sub {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.sekasma-pixel-logo {
+  display: block;
+  width: min(100%, 218px);
+  height: 43px;
+  image-rendering: pixelated;
+  overflow: visible;
+}
+.sekasma-pixel-logo-large { width: min(100%, 310px); height: 75px; }
+.sekasma-pixel-letters { filter: drop-shadow(0 0 2px rgba(255, 108, 231, .5)); }
+@keyframes sekasma-orb-glow {
+  0%,100% { opacity: .87; }
+  50% { opacity: 1; }
+}
+@keyframes sekasma-pixel-flicker {
+  0%, 15%, 54%, 100% { opacity: .15; }
+  7%, 36%, 80% { opacity: 1; }
+}
+.sekasma-pixel-orb { animation: sekasma-orb-glow 2.5s steps(3,end) infinite; }
+.sekasma-pixel-spark-one { animation: sekasma-pixel-flicker 2.8s steps(1,end) infinite; }
+.sekasma-pixel-spark-two { animation: sekasma-pixel-flicker 3.2s steps(1,end) -1.3s infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .sekasma-pixel-orb, .sekasma-pixel-spark { animation: none; }
 }

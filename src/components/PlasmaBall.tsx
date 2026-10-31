@@ -19,7 +19,8 @@ import {
   drawPixelText,
 } from "../render/sprites";
 import { drawPlasmaArc, pixelCircle } from "../render/plasma";
-import { visibleHelperCount } from "../render/limits";
+import { visibleHelperCounts } from "../render/limits";
+import { advanceStickman, createStickman, type StickmanMotion } from "../render/stickmen";
 import type { Ripple, FloatText, Flash, HoldArc, Wanderer } from "../render/plasma";
 import type { Gas, GasRecord } from "../game/types";
 
@@ -47,7 +48,7 @@ export default function PlasmaBall({
   const holdArcs = useRef<HoldArc[]>([]);
   const fingerSeeds = useRef<Wanderer[]>([]);
   const toeSeeds = useRef<Wanderer[]>([]);
-  const stickTimers = useRef<number[]>([]);
+  const stickAgents = useRef<StickmanMotion[]>([]);
   const propsRef = useRef({ filaments, splits, unlocked, fingers, toes, ghosts, stickmen, crackles });
   propsRef.current = { filaments, splits, unlocked, fingers, toes, ghosts, stickmen, crackles };
   const neonPowRef = useRef(neonPow);
@@ -79,13 +80,18 @@ export default function PlasmaBall({
         b.fillRect(x, y, 1, 1);
       }
       b.globalAlpha = 1;
-      // Wider stepped stand to make the sphere feel grounded.
-      b.fillStyle = "#14102a";
-      b.fillRect(CX - 9, CY + R + 1, 18, 4);
-      b.fillRect(CX - 16, CY + R + 5, 32, 3);
-      b.fillStyle = "#1f1838";
-      b.fillRect(CX - 5, CY + R + 2, 10, 1);
-      b.fillRect(CX - 11, CY + R + 6, 22, 1);
+      // Stepped pedestal, visibly wider than the glass neck.
+      b.fillStyle = "#0d0922";
+      b.fillRect(CX - 12, CY + R + 1, 24, 3);
+      b.fillRect(CX - 16, CY + R + 4, 32, 6);
+      b.fillRect(CX - 22, CY + R + 10, 44, 4);
+      b.fillStyle = "#45366e";
+      b.fillRect(CX - 10, CY + R + 1, 20, 2);
+      b.fillRect(CX - 14, CY + R + 5, 28, 2);
+      b.fillStyle = "#6d57a0";
+      b.fillRect(CX - 20, CY + R + 10, 40, 2);
+      b.fillStyle = "#21163d";
+      b.fillRect(CX - 19, CY + R + 13, 38, 1);
     }
 
     // ---- glass cache: dead + lit, rebuilt when gases change ----
@@ -212,24 +218,28 @@ export default function PlasmaBall({
       return u[u.length - 1];
     };
 
-    const drawStickman = (x: number, y: number, swing: number) => {
-      const sx = Math.round(x), sy = Math.round(y);
+    const drawStickman = (x: number, y: number, attack: boolean, stride: boolean, facing: number) => {
+      ctx.save();
+      ctx.translate(Math.round(x), Math.round(y));
+      ctx.scale(facing, 1);
+      // Walking legs, alternating foot positions, separate from the attack pose.
       ctx.fillStyle = "#20152e";
-      ctx.fillRect(sx + 1, sy, 3, 3);
-      ctx.fillRect(sx + 2, sy + 3, 1, 3);
-      ctx.fillRect(sx + 1, sy + 6, 1, 2);
-      ctx.fillRect(sx + 3, sy + 6, 1, 2);
+      ctx.fillRect(-2, -9, 4, 4);
+      ctx.fillRect(-1, -5, 2, 4);
+      ctx.fillRect(stride ? -3 : -2, -1, 2, 2);
+      ctx.fillRect(stride ? 1 : 0, -1, 2, 2);
       ctx.fillStyle = "#fff2c7";
-      ctx.fillRect(sx + 2, sy + 1, 1, 1);
+      ctx.fillRect(0, -8, 1, 1);
+      ctx.fillStyle = "#ffb347";
+      ctx.fillRect(-2, -5, 3, 1);
       ctx.fillStyle = "#20152e";
-      ctx.fillRect(sx + (swing ? 3 : 1), sy + 3, 2, 1);
-      ctx.fillRect(sx + 1, sy + 4, swing ? 4 : 2, 1);
-      if (swing) {
-        ctx.fillStyle = "#ffb347";
-        ctx.fillRect(sx + 5, sy + 4, 1, 1);
+      ctx.fillRect(-4, attack ? -8 : -4, 3, 1);
+      ctx.fillRect(1, attack ? -8 : -4, 4, 1);
+      if (attack) {
         ctx.fillStyle = "#fff1c7";
-        ctx.fillRect(sx + 6, sy + 4, 1, 1);
+        ctx.fillRect(5, -8, 2, 2);
       }
+      ctx.restore();
     };
     const drawGlassCrack = (crack: { x: number; y: number; age: number; ttl: number; seed: number }) => {
       ctx.globalAlpha = Math.max(0, 1 - crack.age / crack.ttl) * 0.9;
@@ -291,10 +301,11 @@ export default function PlasmaBall({
       last = now;
 
       const { filaments: fil, fingers: fing, toes: toe, ghosts: ghs, stickmen: stm, unlocked: u, crackles: crk } = propsRef.current;
-      const visibleFingers = visibleHelperCount(fing, "fingers");
-      const visibleToes = visibleHelperCount(toe, "toes");
-      const visibleGhosts = visibleHelperCount(propsRef.current.ghosts, "ghosts");
-      const visibleStickmen = visibleHelperCount(propsRef.current.stickmen, "stickmen");
+      const visible = visibleHelperCounts({ fingers: fing, toes: toe, ghosts: ghs, stickmen: stm });
+      const visibleFingers = visible.fingers;
+      const visibleToes = visible.toes;
+      const visibleGhosts = visible.ghosts;
+      const visibleStickmen = visible.stickmen;
       const sig = u.map((g) => g.id).join(",");
       if (cache.sig !== sig) buildBg(sig);
 
@@ -533,25 +544,29 @@ export default function PlasmaBall({
       runHelpers(fingerSeeds, visibleFingers, FINGER_ORIENTS, false, false);
       runHelpers(toeSeeds, visibleToes, FOOT_ORIENTS, true, false);
 
-      // Stickmen attack the globe; cracks fade and visually self-repair.
-      while (stickTimers.current.length < visibleStickmen)
-        stickTimers.current.push(t + 0.5 + Math.random() * 1.5);
-      if (stickTimers.current.length > visibleStickmen)
-        stickTimers.current.length = visibleStickmen;
+      // Independent roam/jump phases: small walkers circle the whole ball and
+      // leap in to hit the glass. Effects are cosmetic; all owned helpers earn.
+      while (stickAgents.current.length < visibleStickmen)
+        stickAgents.current.push(createStickman(stickAgents.current.length, t));
+      if (stickAgents.current.length > visibleStickmen)
+        stickAgents.current.length = visibleStickmen;
       for (let i = 0; i < visibleStickmen; i++) {
-        const ratio = visibleStickmen <= 1 ? 0.5 : i / (visibleStickmen - 1);
-        const angle = Math.PI / 2 + (ratio - 0.5) * 0.95;
-        const x = CX + Math.cos(angle) * (R - 4);
-        const y = CY + Math.sin(angle) * (R - 4);
-        if (t >= stickTimers.current[i]) {
-          stickTimers.current[i] = t + 1.2 + Math.random() * 1.8;
-          glassCracks.current.push({ x, y, age: 0, ttl: 0.45 + Math.random() * 0.25, seed: t + i * 1.3 });
-          flashes.current.push({ x, y, age: 0, forks: 2, amp: 4.5, gas: pickGas() });
-          ripples.current.push({ x, y, age: 0, color: "#ffd166" });
+        const agent = stickAgents.current[i];
+        const pose = advanceStickman(agent, t, dt);
+        const radius = R + 9 - pose.jump * 12;
+        const x = CX + Math.cos(pose.angle) * radius;
+        const y = CY + Math.sin(pose.angle) * radius - pose.jump * 3;
+        if (pose.strike) {
+          const impactX = CX + Math.cos(pose.angle) * (R - 3);
+          const impactY = CY + Math.sin(pose.angle) * (R - 3);
+          glassCracks.current.push({ x: impactX, y: impactY, age: 0, ttl: 0.55, seed: t + i * 1.3 });
+          flashes.current.push({ x: impactX, y: impactY, age: 0, forks: 2, amp: 4.5, gas: pickGas() });
+          ripples.current.push({ x: impactX, y: impactY, age: 0, color: "#ffd166" });
         }
-        const swinging = stickTimers.current[i] - t < 0.16 ? 1 : 0;
-        drawStickman(x - 4, CY + R + 1 + Math.abs(ratio - 0.5) * 5, swinging);
+        drawStickman(x, y, pose.attack, pose.stride, Math.cos(pose.angle) > 0 ? -1 : 1);
       }
+      if (glassCracks.current.length > 16)
+        glassCracks.current.splice(0, glassCracks.current.length - 16);
       glassCracks.current = glassCracks.current.filter((crack) => crack.age < crack.ttl);
       for (const crack of glassCracks.current) {
         crack.age += dt;

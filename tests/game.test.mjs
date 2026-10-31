@@ -4,7 +4,8 @@ import { accrueIdle, accrueOffline, bulkCost, cappedOfflineSeconds, fingerCost, 
 import { OFFLINE_CAP_S } from "../src/game/config.ts";
 import { BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
 import { measureTick } from "../src/game/timing.ts";
-import { visibleHelperCount } from "../src/render/limits.ts";
+import { visibleHelperCount, visibleHelperCounts, MAX_VISIBLE_HELPERS } from "../src/render/limits.ts";
+import { advanceStickman, createStickman } from "../src/render/stickmen.ts";
 
 test("offline settlement is capped and handles negative time", () => {
   assert.equal(cappedOfflineSeconds(0, 86400000), OFFLINE_CAP_S);
@@ -87,10 +88,10 @@ test("visual helper caps never limit economy ownership or income", () => {
   const s = { ...freshSave(), fingers: 5000, toes: 100, ghosts: 30, unlocked: ["neon", "argon", "xenon"] };
   const earned = accrueIdle(s, 10).gain.neon;
   assert.ok(earned > accrueIdle({ ...s, fingers: 20, toes: 12, ghosts: 10 }, 10).gain.neon);
-  assert.equal(visibleHelperCount(s.fingers, "fingers"), 20);
-  assert.equal(visibleHelperCount(s.toes, "toes"), 12);
-  assert.equal(visibleHelperCount(s.ghosts, "ghosts"), 10);
-  assert.equal(visibleHelperCount(10, "stickmen"), 6);
+  assert.equal(visibleHelperCount(s.fingers, "fingers"), 7);
+  assert.equal(visibleHelperCount(s.toes, "toes"), 4);
+  assert.equal(visibleHelperCount(s.ghosts, "ghosts"), 4);
+  assert.equal(visibleHelperCount(10, "stickmen"), 4);
   assert.equal(visibleHelperCount(-10, "fingers"), 0);
 });
 
@@ -228,4 +229,30 @@ test("v13 save migrations preserve old progress and add Krypton and Stickmen", (
   assert.equal(result.stickmen, 0);
   assert.equal(result.plasma.krypton, 0);
   assert.deepEqual(result.unlocked, ["neon"]);
+});
+
+test("all helper types share a twelve-sprite on-screen budget, not an income cap", () => {
+  const counts = visibleHelperCounts({ fingers: 200, toes: 30, ghosts: 40, stickmen: 500 });
+  assert.equal(Object.values(counts).reduce((a, b) => a + b, 0), MAX_VISIBLE_HELPERS);
+  assert.ok(Object.values(counts).every(n => n > 0));
+  assert.deepEqual(visibleHelperCounts({ fingers: 0, toes: 0, ghosts: 0, stickmen: 0 }),
+    { fingers: 0, toes: 0, ghosts: 0, stickmen: 0 });
+  assert.equal(visibleHelperCounts({ fingers: 0, toes: 0, ghosts: 0, stickmen: 1 }).stickmen, 1);
+});
+
+test("Stickmen move around the orb, jump, then strike exactly once per leap", () => {
+  const agent = createStickman(0, 0);
+  let strikes = 0, framesInAir = 0, walking = false;
+  const origin = agent.angle;
+  for (let step = 0; step < 150; step++) {
+    const pose = advanceStickman(agent, step * .04, .04);
+    if (pose.strike) strikes++;
+    if (pose.jump > 0) framesInAir++;
+    if (pose.stride) walking = true;
+    if (pose.strike) assert.equal(pose.attack, true);
+  }
+  assert.ok(agent.angle !== origin);
+  assert.ok(framesInAir >= 5);
+  assert.ok(walking);
+  assert.ok(strikes >= 2 && strikes <= 4);
 });

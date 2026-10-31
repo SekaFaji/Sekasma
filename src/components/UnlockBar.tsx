@@ -11,7 +11,7 @@ export default function UnlockBar({ cost, color, plasma, label }: {
   const percent = affordabilityPercent(cost, plasma);
   if (percent >= 100) return null;
   return (
-    <div className="mt-0.5 flex max-w-[110px] items-center gap-1">
+    <div className="flex h-[12px] max-w-[110px] items-center gap-1">
       <div
         role="progressbar"
         aria-label={`${label} affordability`}
