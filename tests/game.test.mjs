@@ -6,6 +6,7 @@ import { BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, 
 import { measureTick } from "../src/game/timing.ts";
 import { visibleHelperCount, visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../src/render/limits.ts";
 import { advanceStickman, createStickman } from "../src/render/stickmen.ts";
+import { PX, CX, CY, R } from "../src/render/geometry.ts";
 
 test("offline settlement is capped and handles negative time", () => {
   assert.equal(cappedOfflineSeconds(0, 86400000), OFFLINE_CAP_S);
@@ -279,9 +280,9 @@ test("helper types have independent fixed power values, not finger-owned scaling
 test("helpers occupy distinct orbital rings without a visual hard limit", () => {
   const radii = Array.from({ length: 80 }, (_, i) => helperOrbitRadius("fingers", i, 57));
   assert.equal(new Set(radii).size, 3);
-  assert.ok(radii.every(r => r > 57));
+  assert.ok(radii.every(r => r < R));
   assert.ok(helperOrbitRadius("ghosts", 0, 57) < 57);
-  assert.ok(helperOrbitRadius("stickmen", 1, 57) > 57);
+  assert.ok(helperOrbitRadius("stickmen", 1, 57) < R);
   assert.equal(visibleHelperCount(Infinity, "fingers"), 0);
   assert.equal(visibleHelperCount(80.9, "fingers"), 80);
 });
@@ -293,4 +294,28 @@ test("costly lighting is sampled independently without hiding any sprites", () =
   assert.equal(visibleHelperCounts(crowd).fingers, 5000);
   assert.equal(visibleHelperCounts(crowd).stickmen, 300);
   assert.equal(helperEffectChance({ fingers: 0, toes: 0, ghosts: 0, stickmen: 0 }), 1);
+});
+
+test("all finger, toe, and stickman orbit rings fit inside the canvas without top-edge clamping", () => {
+  assert.equal(CY, 70); // enough headroom and room for the enlarged pedestal
+  for (const kind of ["fingers", "toes", "stickmen"]) {
+    for (let ring = 0; ring < 3; ring++) {
+      const orbit = helperOrbitRadius(kind, ring, R);
+      assert.ok(orbit > 0 && orbit < R);
+      // drawOriented adds half the oriented sprite length to the orbit anchor;
+      // use the 14px maximum of the baked 45-degree sprite.
+      const drawRadius = orbit + (kind === "stickmen" ? 0 : 7);
+      for (let step = 0; step < 360; step++) {
+        const angle = (step * Math.PI) / 180;
+        const x = CX + Math.cos(angle) * drawRadius;
+        const y = CY + Math.sin(angle) * drawRadius;
+        const halfWidth = kind === "stickmen" ? 8 : 7;
+        const topHeight = kind === "stickmen" ? 10 : 7;
+        const bottomHeight = kind === "stickmen" ? 2 : 7;
+        assert.ok(x - halfWidth >= 0 && x + halfWidth < PX, `${kind} ring ${ring} x clipped`);
+        assert.ok(y - topHeight >= 0 && y + bottomHeight < PX, `${kind} ring ${ring} y clipped`);
+      }
+    }
+  }
+  assert.ok(CY + R + 14 < PX); // oversized pedestal still fits below the sphere
 });

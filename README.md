@@ -96,6 +96,9 @@ The repository contains an npm-generated `package-lock.json` (lockfile v3). Use 
 
 ## Mobile browser smoke test
 
+Version 0.12.18: verify the upgrade sub-tabs read HELP, POWER, GAS in that order. On Android with dozens of Fingers/Toes/Stickmen, helpers should move all around the ball rather than accumulating in horizontal strips at the top or sides. The ball, glass rim and larger stand should remain inside the square canvas. All owned helpers remain visually represented. Prestige remains a design discussion and its fourth main tab has **not** been enabled.
+
+
 Version 0.12.17: with 80 Fingers purchased, inspect the sphere for a dense, mobile array of individually drawn Fingers instead of only 7. Toes and Ghost Hands also remain on-screen in full; Stickmen continue to roam and strike. At higher counts, flashes are sampled for mobile performance, not sprites or income. Change between HELP, GAS and POWER: the lower panel must keep the same height with no jump. You can still scroll within the shared panel on short screens. There is **no Prestige ownership cap yet**; that needs its own approved progression rules.
 
 
