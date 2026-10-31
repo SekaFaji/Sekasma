@@ -48,3 +48,7 @@ html, body, #root {
 }
 /* No horizontal overflow when three gas balances are present on narrow devices. */
 .sekasma-currency-value { overflow-wrap: anywhere; }
+
+.sekasma-currency-rail { scrollbar-width: thin; scrollbar-color: #56427d #120a2e; }
+.sekasma-currency-rail::-webkit-scrollbar { height: 3px; }
+.sekasma-currency-rail::-webkit-scrollbar-thumb { background: #56427d; }
