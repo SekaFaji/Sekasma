@@ -8,7 +8,7 @@ import { HOLD_INTERVAL, PRESS_INTERVAL } from "../game/config";
 import { fmtShort } from "../utils/format";
 import { haptic } from "../utils/haptic";
 import { PX, CX, CY, R } from "../render/geometry";
-import { BACK_PALETTE, SKIN_PALETTE } from "../render/palette";
+import { SKIN_PALETTE } from "../render/palette";
 import {
   PLAYER_FINGER,
   FINGER_ORIENTS,
@@ -19,7 +19,7 @@ import {
   drawPixelText,
 } from "../render/sprites";
 import { drawPlasmaArc, pixelCircle } from "../render/plasma";
-import { visibleHelperCounts } from "../render/limits";
+import { visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../render/limits";
 import { advanceStickman, createStickman, type StickmanMotion } from "../render/stickmen";
 import type { Ripple, FloatText, Flash, HoldArc, Wanderer } from "../render/plasma";
 import type { Gas, GasRecord } from "../game/types";
@@ -316,32 +316,35 @@ export default function PlasmaBall({
       const held = pts.length > 0;
       const activeFlash = flashes.current.length > 0;
 
-      // Rendering is deliberately capped: simulation earnings still use the full owned count.
-      // ---- one pass over all helpers (front or back) ----
+      // Every purchased helper is drawn. Only costly visual effects are sampled.
+      const effectChance = helperEffectChance({ fingers: fing, toes: toe, ghosts: ghs, stickmen: stm });
+      // ---- moving helpers spread across several concentric rings ----
       const runHelpers = (
         seeds: { current: Wanderer[] }, count: number, orients: string[][],
-        foot: boolean, backPass: boolean,
+        kind: "fingers" | "toes",
       ) => {
         while (seeds.current.length < count) seeds.current.push(newWanderer(seeds.current.length, t));
         if (seeds.current.length > count) seeds.current.length = count;
-        for (const w of seeds.current) {
-          if (w.back !== backPass) continue;
-          const angle = w.base + w.drift * t + Math.sin(t * w.wob + w.phase) * (foot ? 0.2 : 0.3);
-          const tx = Math.round(CX + Math.cos(angle) * (R - 1));
-          const ty = Math.round(CY + Math.sin(angle) * (R - 1));
+        for (let i = 0; i < seeds.current.length; i++) {
+          const w = seeds.current[i];
+          const angle = w.base + w.drift * t + Math.sin(t * w.wob + w.phase) * (kind === "toes" ? 0.2 : 0.3);
+          const radius = helperOrbitRadius(kind, i, R);
+          const tx = Math.round(CX + Math.cos(angle) * radius);
+          const ty = Math.round(CY + Math.sin(angle) * radius);
           if (t >= w.timer) {
             w.timer = t + PRESS_INTERVAL;
-            flashes.current.push(newFlash(tx, ty, foot));
-            if (foot) flashes.current.push({ ...newFlash(tx, ty, foot) });
-            if (Math.random() < (foot ? 0.2 : 0.08)) flashes.current.push(strayFlash());
-            const c = pickGas().color;
-            ripples.current.push({ x: tx, y: ty, age: 0, color: c });
+            // Each helper still animates. Only large flash/ripple effects are
+            // sampled so owning thousands doesn't allocate thousands of arcs.
+            if (Math.random() < effectChance) {
+              flashes.current.push(newFlash(tx, ty, kind === "toes"));
+              if (Math.random() < 0.2) flashes.current.push(strayFlash());
+              ripples.current.push({ x: tx, y: ty, age: 0, color: pickGas().color });
+            }
           }
           const since = t - (w.timer - PRESS_INTERVAL);
-          drawOriented(
-            ctx, orients, angle,
-            Math.max(0, 1 - since / (foot ? 0.35 : 0.3)),
-            w.back ? BACK_PALETTE : SKIN_PALETTE,
+          drawOriented(ctx, orients, angle,
+            Math.max(0, 1 - since / (kind === "toes" ? 0.35 : 0.3)),
+            SKIN_PALETTE, radius,
           );
         }
       };
@@ -349,10 +352,7 @@ export default function PlasmaBall({
       ctx.clearRect(0, 0, PX, PX);
       ctx.drawImage(far, 0, 0);
 
-      // helpers pressing from BEHIND the glass: silhouettes, mostly hidden
-      runHelpers(fingerSeeds, visibleFingers, FINGER_ORIENTS, false, true);
-      runHelpers(toeSeeds, visibleToes, FOOT_ORIENTS, true, true);
-
+      // Draw the glass first: helpers aren't hidden behind an opaque layer.
       // the glass
       ctx.drawImage(held || activeFlash ? cache.lit : cache.dead, 0, 0);
 
@@ -387,7 +387,7 @@ export default function PlasmaBall({
       if (ghostOffs.length > gho) ghostOffs.length = gho;
       for (let gi = 0; gi < gho; gi++) {
         const { st, p } = ghostState(gi, t);
-        if (st === 3) continue;
+        // Resting ghost hands remain faintly visible, so none disappear from the workforce.
         const ang = gi * 2.399963 + Math.sin(t * 0.11 + gi * 1.7) * 0.15;
         let reach: number;
         let alpha: number;
@@ -399,12 +399,16 @@ export default function PlasmaBall({
           reach = R - 7 + Math.sin(t * 13 + gi) * 0.7;
           alpha = 0.62 + Math.sin(t * 9 + gi) * 0.1;
           ghostHold = { ang };
-        } else {
+        } else if (st === 2) {
           reach = R - 7 + p * 14;
-          alpha = 0.75 * (1 - p);
+          alpha = Math.max(0.24, 0.75 * (1 - p));
+        } else {
+          reach = helperOrbitRadius("ghosts", gi, R);
+          alpha = 0.26;
         }
-        drawGhost(ctx, ang, reach, alpha, t + gi);
-        if (st === 1) {
+        // Multiple ghost rings make large armies identifiable inside the ball.
+        drawGhost(ctx, ang, Math.min(reach, helperOrbitRadius("ghosts", gi, R)), alpha, t + gi);
+        if (st === 1 && Math.random() < effectChance) {
           // your strings bend toward its palm
           drawPlasmaArc(
             ctx, CX, CY,
@@ -540,9 +544,9 @@ export default function PlasmaBall({
       ctx.fillRect(CX - 1, CY + 3, 3, 1);
       ctx.globalAlpha = 1;
 
-      // helpers on THIS side of the glass: full color
-      runHelpers(fingerSeeds, visibleFingers, FINGER_ORIENTS, false, false);
-      runHelpers(toeSeeds, visibleToes, FOOT_ORIENTS, true, false);
+      // Draw every Finger and Toe in full color, including the back-facing ones.
+      runHelpers(fingerSeeds, visibleFingers, FINGER_ORIENTS, "fingers");
+      runHelpers(toeSeeds, visibleToes, FOOT_ORIENTS, "toes");
 
       // Independent roam/jump phases: small walkers circle the whole ball and
       // leap in to hit the glass. Effects are cosmetic; all owned helpers earn.
@@ -553,10 +557,10 @@ export default function PlasmaBall({
       for (let i = 0; i < visibleStickmen; i++) {
         const agent = stickAgents.current[i];
         const pose = advanceStickman(agent, t, dt);
-        const radius = R + 9 - pose.jump * 12;
+        const radius = helperOrbitRadius("stickmen", i, R) + 2 - pose.jump * 12;
         const x = CX + Math.cos(pose.angle) * radius;
         const y = CY + Math.sin(pose.angle) * radius - pose.jump * 3;
-        if (pose.strike) {
+        if (pose.strike && Math.random() < effectChance) {
           const impactX = CX + Math.cos(pose.angle) * (R - 3);
           const impactY = CY + Math.sin(pose.angle) * (R - 3);
           glassCracks.current.push({ x: impactX, y: impactY, age: 0, ttl: 0.55, seed: t + i * 1.3 });

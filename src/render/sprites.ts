@@ -118,6 +118,11 @@ export const FINGER_ORIENTS = sprOrients8(FINGER_SPRITE);
 export const FOOT_ORIENTS = sprOrients8(FOOT_SPRITE);
 export const GHOST_ORIENTS = sprOrients8(GHOST_SPRITE);
 
+/** Rasterize repeated pixel sprites only once, then blit cached bitmaps.
+ * One drawImage per helper instead of dozens of per-pixel fillRect calls.
+ * Cache holds only the small, fixed set of sprite orientations/palettes.
+ */
+const spriteAtlas = new Map<string, HTMLCanvasElement>();
 export function drawSprite(
   ctx: CanvasRenderingContext2D,
   sprite: string[],
@@ -125,13 +130,23 @@ export function drawSprite(
   y: number,
   palette: Record<string, string>,
 ) {
-  for (let r = 0; r < sprite.length; r++)
-    for (let c = 0; c < sprite[r].length; c++) {
-      const ch = sprite[r][c];
-      if (ch === ".") continue;
-      ctx.fillStyle = palette[ch];
-      ctx.fillRect(x + c, y + r, 1, 1);
-    }
+  const key = sprite.join("|") + JSON.stringify(palette);
+  let art = spriteAtlas.get(key);
+  if (!art) {
+    art = document.createElement("canvas");
+    art.width = sprite[0].length;
+    art.height = sprite.length;
+    const pen = art.getContext("2d")!;
+    for (let r = 0; r < sprite.length; r++)
+      for (let c = 0; c < sprite[r].length; c++) {
+        const ch = sprite[r][c];
+        if (ch === ".") continue;
+        pen.fillStyle = palette[ch];
+        pen.fillRect(c, r, 1, 1);
+      }
+    spriteAtlas.set(key, art);
+  }
+  ctx.drawImage(art, Math.round(x), Math.round(y));
 }
 
 export function drawOriented(
@@ -140,6 +155,7 @@ export function drawOriented(
   angle: number,
   press: number,
   palette: Record<string, string>,
+  orbitRadius = R - 1,
 ) {
   const inwardA = angle + Math.PI;
   const idx = ((Math.round((inwardA + Math.PI / 2) / (Math.PI / 4)) % 8) + 8) % 8;
@@ -147,7 +163,7 @@ export function drawOriented(
   const w = spr[0].length;
   const h = spr.length;
   const len = Math.max(w, h);
-  const rad = R - 1 - Math.round(press * 2) + len / 2;
+  const rad = orbitRadius - Math.round(press * 2) + len / 2;
   drawSprite(
     ctx, spr,
     Math.round(CX + Math.cos(angle) * rad - w / 2),
