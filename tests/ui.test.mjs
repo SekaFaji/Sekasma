@@ -272,7 +272,8 @@ test("all four helper upgrades are rendered as compact rows on HELP", async () =
   for (const power of [1, 8, 20, 45]) assert.match(html, new RegExp(`POWER ${power} · OWN`));
   assert.doesNotMatch(html, /× FINGER/);
   const app = renderToStaticMarkup(React.createElement(App));
-  assert.match(app, /sekasma-panel-shell--help/);
+  assert.match(app, /sekasma-panel-shell/);
+  assert.doesNotMatch(app, /sekasma-panel-shell--help/);
 });
 
 test("four-currency BUY shows each unique gas bolt without overflowing a price grid", () => {
@@ -352,4 +353,10 @@ test("maxed upgrades hide quantity controls while unaffordable upgrades retain t
   assert.match(panel, /MAXED/);
   assert.doesNotMatch(panel, /aria-label="NEON ARC quantity"/);
   assert.match(panel, /aria-label="NEON VOLTS quantity"/);
+});
+
+test("switching HELP, GAS and POWER keeps one stable panel shell", () => {
+  const html = renderToStaticMarkup(React.createElement(App));
+  assert.equal((html.match(/sekasma-panel-shell relative/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /sekasma-panel-shell--help/);
 });

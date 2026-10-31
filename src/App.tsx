@@ -230,7 +230,7 @@ export default function App() {
         </nav>
 
         {/* Keep feedback anchored to the panel viewport, never inside scroll content. */}
-        <div className={`sekasma-panel-shell relative min-h-0 shrink-0 ${tab === "upgrades" && upTab === "help" ? "sekasma-panel-shell--help" : ""}`}>
+        <div className="sekasma-panel-shell relative min-h-0 shrink-0">
           <div ref={panelScrollRef} className="sekasma-scroll h-full overflow-y-auto overscroll-contain bg-[#0d0820] p-2">
           {tab === "upgrades" && (
             <UpgradePanel state={state} unlockedGases={unlockedGases} accent={accent}

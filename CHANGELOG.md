@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.12.17 — Full visible helper army and consistent panels
+
+- Remove per-type and shared visual helper caps; every purchased Finger, Big Toe, Ghost Hand and Stickman is represented in the plasma animation
+- Put Fingers and Toes on concentric orbital rings and keep resting Ghost Hands faintly visible
+- Keep Stickmen running, leaping and striking independently across staggered rings
+- Cache sprite orientations/palettes as tiny canvas images so repeated drawing uses fast blits instead of hundreds of pixel loops
+- Sample costly autonomous lightning/crack/ripple effects when helper counts grow, but never sample or hide owned helper sprites
+- Give HELP, GAS, POWER, STATS and OPTIONS the same bottom panel dimensions; remove special HELP-only sizing and tab jumps
+- Preserve all game economy, upgrades, existing saves and player progression
+- Add regression tests for counts above previous render caps, high-count effect sampling and unified panel layout
+- Prestige ownership caps intentionally not implemented until their balance and reset behavior are agreed
+
+
 ## 0.12.16 — Compact four-column Stats, community links, maxed upgrades
 
 - Group general counters under a titled GENERAL STATS section matching each gas's own category
