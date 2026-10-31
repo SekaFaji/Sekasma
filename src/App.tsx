@@ -7,6 +7,7 @@ import PlasmaBall from "./components/PlasmaBall";
 import CurrencyHeader from "./components/CurrencyHeader";
 import WelcomeBack, { type WelcomeSummary } from "./components/WelcomeBack";
 import UpgradePanel, { type UpTab } from "./components/UpgradePanel";
+import type { BuyQuantity } from "./components/UpgradeRow";
 import StatsPanel from "./components/StatsPanel";
 import OptionsPanel from "./components/OptionsPanel";
 import { GAS_LIST, gasById, nextGas } from "./game/gases";
@@ -25,7 +26,7 @@ export default function App() {
   const [saveWarning, setSaveWarning] = useState(false);
   const [tab, setTab] = useState<Tab>("upgrades");
   const [upTab, setUpTab] = useState<UpTab>("help");
-  const [qty, setQty] = useState<number | "max">(1);
+  const [quantities, setQuantities] = useState<Record<string, BuyQuantity>>({});
   const [scanlines, setScanlines] = useState(() => loadOpts().scan);
   const [buzz, setBuzz] = useState(() => loadOpts().buzz);
   const [toast, setToast] = useState<string | null>(null);
@@ -130,8 +131,8 @@ export default function App() {
     if (buzz) haptic(ms);
   };
 
-  const buy = (kind: BuyKind, gid?: GasId) => {
-    const want = kind === "gas" ? 1 : qty === "max" ? 1000 : qty;
+  const buy = (kind: BuyKind, gid?: GasId, quantity: BuyQuantity = 1) => {
+    const want = kind === "gas" ? 1 : quantity === "max" ? 1000 : quantity;
     const pre = bulkCost(stateRef.current, kind, gid, want);
     setState((s) => purchaseUpgrade(s, kind, gid, want).state);
     if (pre.count > 0) {
@@ -182,7 +183,7 @@ export default function App() {
           />
         )}
 
-        <CurrencyHeader state={state} gases={unlockedGases} rates={rates} qty={qty} onQtyChange={setQty} />
+        <CurrencyHeader state={state} gases={unlockedGases} rates={rates} />
 
         {saveWarning && (
           <div role="alert" className="border-b border-[#ffb86b]/40 bg-[#35200c] px-3 py-2 text-[11px] text-[#ffd8a4]">
@@ -232,7 +233,9 @@ export default function App() {
           <div ref={panelScrollRef} className="sekasma-scroll h-full overflow-y-auto overscroll-contain bg-[#0d0820] p-2">
           {tab === "upgrades" && (
             <UpgradePanel state={state} unlockedGases={unlockedGases} accent={accent}
-              upTab={upTab} onUpTabChange={switchUpgradeTab} qty={qty} onBuy={buy} />
+              upTab={upTab} onUpTabChange={switchUpgradeTab} quantities={quantities}
+              onQuantityChange={(key, quantity) => setQuantities((old) => ({ ...old, [key]: quantity }))}
+              onBuy={buy} />
           )}
 
           {tab === "stats" && (
@@ -252,6 +255,7 @@ export default function App() {
                   stateRef.current = fresh;
                   setState(fresh);
                   setWelcome(null);
+                  setQuantities({});
                   setToast(null);
                   setConfirmReset(false);
                 } else setConfirmReset(true);
