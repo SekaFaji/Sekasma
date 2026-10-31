@@ -119,7 +119,8 @@ test("currency header keeps gas totals in distinct, wrapping cards", async () =>
   assert.match(html, /sekasma-currency-rail/);
   assert.equal((html.match(/role="listitem"/g) ?? []).length, 3);
   for (const name of ["NEON", "ARGON", "XENON"]) assert.match(html, new RegExp(name));
-  assert.equal((html.match(/sekasma-currency-value/g) ?? []).length, 3);
+  assert.match(html, /aria-label="Gas balances"/);
+  assert.doesNotMatch(html, /Bulk buy quantity/);
   assert.doesNotMatch(html, /truncate/);
 });
 
