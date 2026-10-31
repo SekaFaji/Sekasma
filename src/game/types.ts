@@ -29,5 +29,6 @@ export type GameState = {
   unlocked: GasId[];
   created: number;
   lastSeen: number;
-  activeSeconds: number; // cumulative visible playtime
+  activeSeconds: number; // cumulative visible/foreground playtime
+  offlineSeconds: number; // capped time away, tracked starting with schema 13
 };

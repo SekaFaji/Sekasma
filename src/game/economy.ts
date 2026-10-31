@@ -163,6 +163,16 @@ export function accrueIdle(s: GameState, seconds: number): { state: GameState; g
   return { state: { ...s, plasma, total }, gain };
 }
 
+/** Record credited absence even if no helpers are owned (and earnings are zero).
+ * Only call for background/resume/stalled time, never a normal visible tick.
+ */
+export function accrueOffline(s: GameState, seconds: number): { state: GameState; gain: GasRecord } {
+  const elapsed = Number.isFinite(seconds) ? Math.min(OFFLINE_CAP_S, Math.max(0, seconds)) : 0;
+  const result = accrueIdle(s, elapsed);
+  if (elapsed === 0) return result;
+  return { state: { ...result.state, offlineSeconds: s.offlineSeconds + elapsed }, gain: result.gain };
+}
+
 /** Atomic purchase used by the UI and tests. */
 export function purchaseUpgrade(
   s: GameState, kind: BuyKind, gid: GasId | undefined, wanted: number,
