@@ -1,6 +1,6 @@
 /** UI-only upgrade tabs; the App shell still owns purchases and persistence. */
 import React from "react";
-import UpgradeRow from "./UpgradeRow";
+import UpgradeRow, { type BuyQuantity } from "./UpgradeRow";
 import InfoRow from "./InfoRow";
 import PixelIcon from "./PixelIcon";
 import { nextGas } from "../game/gases";
@@ -14,16 +14,27 @@ import type { Gas, GasId, GameState } from "../game/types";
 
 export type UpTab = "help" | "gas" | "power";
 
-export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUpTabChange, qty, onBuy }: {
+export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUpTabChange, quantities, onQuantityChange, onBuy }: {
   state: GameState; unlockedGases: Gas[]; accent: string;
   upTab: UpTab; onUpTabChange: (tab: UpTab) => void;
-  qty: number | "max";
-  onBuy: (kind: BuyKind, gid?: GasId) => void;
+  quantities: Record<string, BuyQuantity>;
+  onQuantityChange: (key: string, quantity: BuyQuantity) => void;
+  onBuy: (kind: BuyKind, gid?: GasId, quantity?: BuyQuantity) => void;
 }) {
-  const bulkWant = qty === "max" ? 1000 : qty;
-  const fingerBuy = bulkCost(state, "finger", undefined, bulkWant);
-  const toeBuy = bulkCost(state, "toe", undefined, bulkWant);
-  const ghostBuy = bulkCost(state, "ghost", undefined, bulkWant);
+  const rowKey = (kind: BuyKind, gid?: GasId) => gid ? `${kind}:${gid}` : kind;
+  const selected = (kind: BuyKind, gid?: GasId): BuyQuantity =>
+    quantities[rowKey(kind, gid)] ?? 1;
+  const quote = (kind: BuyKind, gid?: GasId) => {
+    const quantity = selected(kind, gid);
+    return bulkCost(state, kind, gid, quantity === "max" ? 1000 : quantity);
+  };
+  const quantityProps = (kind: BuyKind, gid?: GasId) => ({
+    quantity: selected(kind, gid),
+    onQtyChange: (value: BuyQuantity) => onQuantityChange(rowKey(kind, gid), value),
+  });
+  const fingerBuy = quote("finger");
+  const toeBuy = quote("toe");
+  const ghostBuy = quote("ghost");
   const argonUnlocked = state.unlocked.includes("argon");
   const xenonUnlocked = state.unlocked.includes("xenon");
   const nxGas = nextGas(state.unlocked);
@@ -83,7 +94,8 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                       (fingerBuy.count > 1 ? ` · +${fingerBuy.count}` : "")}
                     cost={fingerBuy.cost}
                     icon={<PixelIcon sprite={FINGER_SPRITE} palette={SKIN_PALETTE} px={2} />}
-                    onBuy={() => buy("finger")}
+                    onBuy={() => buy("finger", undefined, selected("finger"))}
+                    {...quantityProps("finger")}
                     disabled={fingerBuy.count === 0}
                     nextCost={peekCost(state, "finger")}
                           plasma={state.plasma}
@@ -95,7 +107,8 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                           (toeBuy.count > 1 ? ` · +${toeBuy.count}` : "")}
                         cost={toeBuy.cost}
                         icon={<PixelIcon sprite={FOOT_SPRITE} palette={SKIN_PALETTE} px={3} />}
-                        onBuy={() => buy("toe")}
+                        onBuy={() => buy("toe", undefined, selected("toe"))}
+                    {...quantityProps("toe")}
                         disabled={toeBuy.count === 0}
                         color={SKIN}
                         nextCost={peekCost(state, "toe")}
@@ -111,6 +124,8 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                           onBuy={() => {}}
                           disabled
                           locked
+                          plasma={state.plasma}
+                          unlockCost={nxGas?.unlockCost}
                         />
                       </React.Fragment>
                     )}
@@ -121,7 +136,8 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                           (ghostBuy.count > 1 ? ` · +${ghostBuy.count}` : "")}
                         cost={ghostBuy.cost}
                         icon={<PixelIcon sprite={GHOST_SPRITE} palette={GHOST_PALETTE} px={3} />}
-                        onBuy={() => buy("ghost")}
+                        onBuy={() => buy("ghost", undefined, selected("ghost"))}
+                    {...quantityProps("ghost")}
                         disabled={ghostBuy.count === 0}
                         color="#b7b2ff"
                         nextCost={peekCost(state, "ghost")}
@@ -137,6 +153,8 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                           onBuy={() => {}}
                           disabled
                           locked
+                          plasma={state.plasma}
+                          unlockCost={nxGas?.unlockCost}
                         />
                       </React.Fragment>
                     )}
@@ -184,11 +202,11 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                   {unlockedGases.map((g) => {
                     const fil = state.filaments[g.id];
                     const nextPow = cracklePower(g, { ...state, filaments: { ...state.filaments, [g.id]: fil + 1 } });
-                    const filBuy = bulkCost(state, "filament", g.id, bulkWant);
+                    const filBuy = quote("filament", g.id);
                     const steps = state.voltage[g.id];
-                    const voltBuy = bulkCost(state, "voltage", g.id, bulkWant);
+                    const voltBuy = quote("voltage", g.id);
                     const spl = state.splits[g.id];
-                    const splitBuy = bulkCost(state, "split", g.id, bulkWant);
+                    const splitBuy = quote("split", g.id);
                     return (
                       <React.Fragment key={g.id}>
                         <div className="mt-1 mb-0.5 px-0.5 text-[10px] font-bold tracking-widest" style={{ color: g.color }}>
@@ -200,7 +218,8 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                             (filBuy.count > 1 ? ` · +${filBuy.count}` : "")}
                           cost={filBuy.cost}
                           icon={<PixelIcon sprite={FIL_ICON} color={g.color} px={3} />}
-                          onBuy={() => buy("filament", g.id)}
+                          onBuy={() => buy("filament", g.id, selected("filament", g.id))}
+                          {...quantityProps("filament", g.id)}
                           disabled={filBuy.count === 0}
                           color={g.color}
                           nextCost={peekCost(state, "filament", g.id)}
@@ -212,7 +231,8 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                             (voltBuy.count > 1 ? ` · +${voltBuy.count} STEPS` : "")}
                           cost={voltBuy.cost}
                           icon={<PixelIcon sprite={VOLT_ICON} color={g.color} px={3} />}
-                          onBuy={() => buy("voltage", g.id)}
+                          onBuy={() => buy("voltage", g.id, selected("voltage", g.id))}
+                          {...quantityProps("voltage", g.id)}
                           disabled={voltBuy.count === 0}
                           color={g.color}
                           nextCost={peekCost(state, "voltage", g.id)}
@@ -224,7 +244,8 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                             (splitBuy.count > 1 ? ` · +${splitBuy.count}` : "")}
                           cost={splitBuy.cost}
                           icon={<PixelIcon sprite={SPLIT_ICON} color={g.color} px={3} />}
-                          onBuy={() => buy("split", g.id)}
+                          onBuy={() => buy("split", g.id, selected("split", g.id))}
+                          {...quantityProps("split", g.id)}
                           disabled={splitBuy.count === 0}
                           color={g.color}
                           nextCost={peekCost(state, "split", g.id)}
