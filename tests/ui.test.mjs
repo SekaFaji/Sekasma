@@ -289,3 +289,67 @@ test("four-currency BUY shows each unique gas bolt without overflowing a price g
   assert.equal((html.match(/viewBox="0 0 7 8"/g) ?? []).length, 4);
   assert.ok(html.includes('w-[94px]'));
 });
+
+test("Stats groups general information separately and uses four-card rows everywhere", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const state = { ...freshSave(), activeSeconds: 120, offlineSeconds: 240, stickmen: 2 };
+  const html = renderToStaticMarkup(React.createElement(StatsPanel, {
+    state, unlockedGases: [gasById("neon"), gasById("argon")], rates: plasma(0),
+  }));
+  assert.match(html, /GENERAL STATS/);
+  assert.match(html, /aria-labelledby="general-stats-heading"/);
+  assert.match(html, /NEON STATS/);
+  assert.match(html, /ARGON STATS/);
+  assert.equal((html.match(/grid grid-cols-4 gap-1/g) ?? []).length, 3);
+  assert.equal((html.match(/<section/g) ?? []).length, 3);
+  assert.match(html, /ACTIVE ONLINE/);
+  assert.match(html, /OFFLINE PLAYTIME/);
+});
+
+test("Options displays verified SekaFaji GitHub, Games Discord and YouTube links", () => {
+  const html = renderToStaticMarkup(React.createElement(OptionsPanel, {
+    scanlines: true, buzz: false, confirmReset: false,
+    onToggleScanlines() {}, onToggleBuzz() {}, onReset() {}, onCancelReset() {},
+  }));
+  for (const [name, url] of [
+    ["GITHUB", "https://github.com/SekaFaji"],
+    ["DISCORD", "https://discord.gg/794QQWJEeP"],
+    ["YOUTUBE", "https://youtube.com/@sekafajigames"],
+  ]) {
+    assert.match(html, new RegExp(name));
+    assert.ok(html.includes(`href="${url}"`), url);
+  }
+  assert.equal((html.match(/rel="noopener noreferrer"/g) ?? []).length, 3);
+  assert.match(html, /COMMUNITY/);
+  assert.match(html, /RESET SAVE/);
+});
+
+test("maxed upgrades hide quantity controls while unaffordable upgrades retain them", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const fresh = freshSave();
+  const maxed = renderToStaticMarkup(React.createElement(UpgradeRow, {
+    name: "NEON ARC", sub: "MAX 12/12", icon: "A", cost: {},
+    nextCost: {}, disabled: true, onBuy() {}, plasma: plasma(0),
+    quantity: "max", onQtyChange() {},
+  }));
+  assert.match(maxed, /MAXED/);
+  assert.doesNotMatch(maxed, /aria-label="NEON ARC quantity"/);
+  assert.doesNotMatch(maxed, /aria-pressed=/);
+  const unaffordable = renderToStaticMarkup(React.createElement(UpgradeRow, {
+    name: "NEON ARC", sub: "NEXT", icon: "A", cost: {},
+    nextCost: { neon: 500 }, disabled: true, onBuy() {}, plasma: plasma(0),
+    quantity: 5, onQtyChange() {},
+  }));
+  assert.match(unaffordable, /aria-label="NEON ARC quantity"/);
+  assert.match(unaffordable, /aria-pressed="true"/);
+  const full = { ...fresh, filaments: { ...fresh.filaments, neon: gasById("neon").cap } };
+  const panel = renderToStaticMarkup(React.createElement(UpgradePanel, {
+    state: full, unlockedGases: [gasById("neon")], accent: "#ff5ec8",
+    upTab: "power", onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {},
+  }));
+  assert.match(panel, /MAXED/);
+  assert.doesNotMatch(panel, /aria-label="NEON ARC quantity"/);
+  assert.match(panel, /aria-label="NEON VOLTS quantity"/);
+});

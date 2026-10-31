@@ -96,6 +96,9 @@ The repository contains an npm-generated `package-lock.json` (lockfile v3). Use 
 
 ## Mobile browser smoke test
 
+For 0.12.16, open STATS and verify GENERAL STATS plus each unlocked gas section show four compact boxes per row, with long values readable. OPTIONS contains real external links for SekaFaji GitHub, SekaFaji Games Discord and YouTube that open in a new tab without resetting progress. After capping NEON ARC, the 1/5/10/100/MAX buttons should disappear for that row, but stay available for unmaxed VOLTS and SPLIT, including purchases that are simply unaffordable.
+
+
 For v0.12.15, open HELP on Android with all four gases unlocked. Verify FINGER, BIG TOE, GHOST HAND and STICKMAN cards appear together in the bottom panel, and each reads POWER (1, 8, 20 or 45) instead of "x FINGER". On upgrades with mixed costs, confirm NEON's pink bolt, ARGON's purple-blue bolt, XENON's cyan bolt and KRYPTON's gold bolt all fit INSIDE their BUY button as two neat columns. Prices use the existing cost calculations; the static helper power numbers preserve previous earnings. Small-height browser layouts still permit scrolling when necessary.
 
 
