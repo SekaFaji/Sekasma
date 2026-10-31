@@ -63,8 +63,8 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                 <div role="tablist" aria-label="Upgrade categories" className="grid grid-cols-3 overflow-hidden border border-white/20 bg-[#140c2b]">
                   {([
                     ["help", "HELP"],
-                    ["gas", "GAS"],
                     ["power", "POWER"],
+                    ["gas", "GAS"],
                   ] as [UpTab, string][]).map(([id, label]) => (
                     <button
                       key={id}

@@ -20,13 +20,17 @@ export function visibleHelperCounts(owned: HelperCounts): HelperCounts {
   };
 }
 
-/** Stagger sprites across concentric rings rather than stacking on the rim. */
+/** Keep every helper's entire sprite within the ball's 150px canvas.
+ * The previous radii grew past the northern edge and sprite clamping
+ * collapsed different helpers into a visible straight line at y=0.
+ * Rings now step inward while retaining a dense, moving army.
+ */
 export function helperOrbitRadius(kind: HelperKind, index: number, ballRadius: number): number {
-  const ring = index % 3;
+  const ring = Math.max(0, Math.floor(index)) % 3;
   if (kind === "ghosts") return ballRadius - 8 - ring * 11;
-  if (kind === "toes") return ballRadius + 5 + ring * 5;
-  if (kind === "stickmen") return ballRadius + 7 + ring * 4;
-  return ballRadius + 2 + ring * 6;
+  if (kind === "toes") return ballRadius - 7 - ring * 4;
+  if (kind === "stickmen") return ballRadius - 3 - ring * 3;
+  return ballRadius - 10 - ring * 4;
 }
 
 /** Probability per autonomous strike for its costly effects; sprites are NEVER sampled. */
