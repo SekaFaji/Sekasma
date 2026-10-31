@@ -4,13 +4,15 @@ import UpgradeRow, { type BuyQuantity } from "./UpgradeRow";
 import InfoRow from "./InfoRow";
 import PixelIcon from "./PixelIcon";
 import { nextGas } from "../game/gases";
-import { SPLIT_CAP, fmtVolts, splitMult, voltMult } from "../game/config";
+import { SPLIT_CAP, STICKMAN_MULT, fmtVolts, splitMult, voltMult } from "../game/config";
 import { bulkCost, canAfford, cracklePower, peekCost } from "../game/economy";
 import type { BuyKind } from "../game/economy";
 import { fmt } from "../utils/format";
-import { FINGER_SPRITE, FOOT_SPRITE, GHOST_SPRITE, GAS_ICON, FIL_ICON, VOLT_ICON, SPLIT_ICON } from "../render/sprites";
+import { FINGER_SPRITE, FOOT_SPRITE, GHOST_SPRITE, STICKMAN_SPRITE, GAS_ICON, FIL_ICON, VOLT_ICON, SPLIT_ICON } from "../render/sprites";
 import { SKIN, SKIN_PALETTE, GHOST_PALETTE } from "../render/palette";
 import type { Gas, GasId, GameState } from "../game/types";
+
+const STICKMAN_PALETTE = { "0": "#20152e", "1": "#fff2c7", "2": "#ff9d2e" };
 
 export type UpTab = "help" | "gas" | "power";
 
@@ -35,8 +37,10 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
   const fingerBuy = quote("finger");
   const toeBuy = quote("toe");
   const ghostBuy = quote("ghost");
+  const stickBuy = quote("stickman");
   const argonUnlocked = state.unlocked.includes("argon");
   const xenonUnlocked = state.unlocked.includes("xenon");
+  const kryptonUnlocked = state.unlocked.includes("krypton");
   const nxGas = nextGas(state.unlocked);
 
   // afford dots for sub-tabs (shown only on tabs you're NOT looking at)
@@ -44,7 +48,8 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
   const subDots: Record<UpTab, boolean> = {
     help:
       fingerBuy.count > 0 || (argonUnlocked && toeBuy.count > 0) ||
-      (xenonUnlocked && ghostBuy.count > 0),
+      (xenonUnlocked && ghostBuy.count > 0) ||
+      (kryptonUnlocked && stickBuy.count > 0),
     gas: !!nxGas && canAfford(state, nxGas.unlockCost),
     power: unlockedGases.some((g) => powerKinds.some((k) => bulkCost(state, k, g.id, 1).count > 0)),
   };
@@ -158,6 +163,31 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                         />
                       </React.Fragment>
                     )}
+                  {kryptonUnlocked
+                    ? <UpgradeRow
+                        name="STICKMAN"
+                        sub={`${STICKMAN_MULT}× FINGER · OWN ${state.stickmen}` +
+                          (stickBuy.count > 1 ? ` · +${stickBuy.count}` : "")}
+                        cost={stickBuy.cost}
+                        icon={<PixelIcon sprite={STICKMAN_SPRITE} palette={STICKMAN_PALETTE} px={3} />}
+                        onBuy={() => buy("stickman", undefined, selected("stickman"))}
+                        {...quantityProps("stickman")}
+                        disabled={stickBuy.count === 0}
+                        color="#ffd166"
+                        nextCost={peekCost(state, "stickman")}
+                        plasma={state.plasma}
+                      />
+                    : <UpgradeRow
+                        name="STICKMAN"
+                        sub="UNLOCKS WITH KRYPTON GAS"
+                        cost={{ krypton: 120 }}
+                        icon={<PixelIcon sprite={STICKMAN_SPRITE} palette={STICKMAN_PALETTE} px={3} />}
+                        onBuy={() => {}}
+                        disabled
+                        locked
+                        plasma={state.plasma}
+                        unlockCost={nxGas?.unlockCost}
+                      />}
                 </>
               )}
 
