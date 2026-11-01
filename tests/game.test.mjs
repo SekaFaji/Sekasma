@@ -7,6 +7,7 @@ import { measureTick } from "../src/game/timing.ts";
 import { visibleHelperCount, visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../src/render/limits.ts";
 import { advanceStickman, createStickman } from "../src/render/stickmen.ts";
 import { PX, CX, CY, R } from "../src/render/geometry.ts";
+import { plasmaDisplacement } from "../src/render/plasma.ts";
 import { BASE_CAPACITY, CAPACITY_STEP, capacityUpgradeCost, helperCapacity, helperRoom, performPrestige, prestigeReward, runPrestigeScore, upgradeCapacity } from "../src/game/prestige.ts";
 
 test("offline settlement is capped and handles negative time", () => {
@@ -322,6 +323,8 @@ test("all finger, toe, and stickman orbit rings fit inside the canvas without to
 });
 
 test("Prestige capacity starts independent for every helper", () => {
+  assert.deepEqual(BASE_CAPACITY, { finger: 30, toe: 25, ghost: 20, stickman: 15 });
+  assert.deepEqual(CAPACITY_STEP, { finger: 10, toe: 5, ghost: 5, stickman: 3 });
   const s = freshSave();
   assert.deepEqual(s.prestige.capacityLevels, { finger: 0, toe: 0, ghost: 0, stickman: 0 });
   for (const kind of ["finger", "toe", "ghost", "stickman"])
@@ -340,6 +343,23 @@ test("legacy ownership migrates without losing or locking hundreds of owned help
   assert.equal(s.fingers, 800);
   assert.equal(s.stickmen, 92);
   assert.equal(s.prestige.sparks, 0);
+});
+
+test("v15 old default helper caps shrink without deleting currently hired helpers", () => {
+  const old = freshSave();
+  old.prestige.legacyCapacity = { finger: 100, toe: 60, ghost: 40, stickman: 40 };
+  old.fingers = 38;
+  old.toes = 10;
+  const migrated = migrateSave({ ...old, v: 15 });
+  assert.equal(migrated.fingers, 38);
+  assert.equal(helperCapacity(migrated, "finger"), 38);
+  assert.equal(helperCapacity(migrated, "toe"), 25);
+  const ready = { ...migrated, unlocked: ["neon", "argon", "xenon", "krypton"],
+    total: { ...migrated.total, krypton: 2000 } };
+  const restarted = performPrestige(ready);
+  assert.equal(restarted.fingers, 0);
+  assert.deepEqual(restarted.prestige.legacyCapacity, BASE_CAPACITY);
+  assert.equal(helperCapacity(restarted, "finger"), 30);
 });
 
 test("Sparks buy permanent individual capacity without mutating existing ownership", () => {
@@ -392,4 +412,18 @@ test("a fully capped helper purchase is blocked, but lifetime earning remains un
   assert.equal(bulkCost(s, "finger", undefined, 5).count, 0);
   assert.strictEqual(purchaseUpgrade(s, "finger", undefined, 1).state, s);
   assert.ok(accrueIdle(s, 10).gain.neon > 0);
+});
+
+
+test("plasma noise is deterministic, organically varied and pinned to endpoints", () => {
+  assert.equal(plasmaDisplacement(0, 2, 3, 4, 1), 0);
+  assert.equal(plasmaDisplacement(1, 2, 3, 4, 1), 0);
+  const first = Array.from({ length: 20 }, (_, i) => plasmaDisplacement((i + 1) / 21, 2, 3, 4, 1));
+  const identical = Array.from({ length: 20 }, (_, i) => plasmaDisplacement((i + 1) / 21, 2, 3, 4, 1));
+  assert.deepEqual(first, identical);
+  assert.ok(new Set(first.map(x => x.toFixed(2))).size > 10);
+  const otherArc = Array.from({ length: 20 }, (_, i) => plasmaDisplacement((i + 1) / 21, 2, 8, 4, 1));
+  assert.notDeepEqual(first, otherArc);
+  const nearbyFrame = plasmaDisplacement(0.4, 2.01, 3, 4, 1);
+  assert.ok(Math.abs(nearbyFrame - plasmaDisplacement(0.4, 2, 3, 4, 1)) < 1);
 });

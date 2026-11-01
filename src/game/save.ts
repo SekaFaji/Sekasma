@@ -76,12 +76,15 @@ function sanitizeSave(s: GameState): GameState {
   };
   const original = freshPrestige();
   const originalCap = capacityRecord(rawPrestige.legacyCapacity, BASE_CAPACITY);
-  // Existing ownership is grandfathered, even for saves from older releases.
+  // v0.12.19 saved its old default limits as "legacy" capacity, even for
+  // brand-new accounts. Normalize those defaults without deleting any helpers.
+  const previousBase: HelperRecord = { finger: 100, toe: 60, ghost: 40, stickman: 40 };
   const legacyCapacity = { ...originalCap };
   for (const [kind, owned] of [
     ["finger", s.fingers], ["toe", s.toes], ["ghost", s.ghosts], ["stickman", s.stickmen],
   ] as [HelperId, number][]) {
-    legacyCapacity[kind] = Math.max(BASE_CAPACITY[kind], originalCap[kind], Math.floor(validNumber(owned)));
+    const preserved = originalCap[kind] === previousBase[kind] ? BASE_CAPACITY[kind] : originalCap[kind];
+    legacyCapacity[kind] = Math.max(BASE_CAPACITY[kind], preserved, Math.floor(validNumber(owned)));
   }
   const lastTotal = record(rawPrestige.lastTotal);
   const prestige: PrestigeProgress = {

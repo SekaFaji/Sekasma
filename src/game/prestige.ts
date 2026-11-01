@@ -3,8 +3,8 @@ import { zero3 } from "./config.ts";
 import type { GameState, HelperId, HelperRecord, PrestigeProgress } from "./types.ts";
 
 export const HELPERS: readonly HelperId[] = ["finger", "toe", "ghost", "stickman"];
-export const BASE_CAPACITY: HelperRecord = { finger: 100, toe: 60, ghost: 40, stickman: 40 };
-export const CAPACITY_STEP: HelperRecord = { finger: 25, toe: 10, ghost: 5, stickman: 5 };
+export const BASE_CAPACITY: HelperRecord = { finger: 30, toe: 25, ghost: 20, stickman: 15 };
+export const CAPACITY_STEP: HelperRecord = { finger: 10, toe: 5, ghost: 5, stickman: 3 };
 export const MIN_PRESTIGE_SCORE = 100_000;
 
 export function freshPrestige(): PrestigeProgress {
@@ -63,6 +63,8 @@ export function performPrestige(s: GameState): GameState {
       ...s.prestige, cycles: s.prestige.cycles + 1,
       sparks: s.prestige.sparks + reward, lifetimeSparks: s.prestige.lifetimeSparks + reward,
       lastTotal: { ...s.total },
+      // Grandfathering only protects already-owned helpers, not future runs.
+      legacyCapacity: { ...BASE_CAPACITY },
     },
   };
 }

@@ -31,12 +31,15 @@ export default function App() {
   const [quantities, setQuantities] = useState<Record<string, BuyQuantity>>({});
   const [scanlines, setScanlines] = useState(() => loadOpts().scan);
   const [buzz, setBuzz] = useState(() => loadOpts().buzz);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastT = useRef<number | undefined>(undefined);
   const panelScrollRef = useRef<HTMLDivElement | null>(null);
   const scrollPositionsRef = useRef<Record<string, number>>({});
   const [resetStep, setResetStep] = useState<ResetStep>(0);
   const [prestigeStep, setPrestigeStep] = useState<PrestigeConfirmStep>(0);
+  const appRootRef = useRef<HTMLDivElement | null>(null);
   const stateRef = useRef(state);
   const restored = useRef(false);
   stateRef.current = state;
@@ -99,6 +102,17 @@ export default function App() {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", onPageHide);
     };
+  }, []);
+
+  // Fullscreen needs a user gesture. Follow browser changes, including Escape.
+  useEffect(() => {
+    const syncFullscreen = () => {
+      setFullscreen(document.fullscreenElement === appRootRef.current);
+      setFullscreenAvailable(Boolean(document.fullscreenEnabled && appRootRef.current?.requestFullscreen));
+    };
+    syncFullscreen();
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
 
   // options persist between sessions
@@ -168,6 +182,14 @@ export default function App() {
     setPrestigeStep(0);
     restoreScroll(viewKey(next, upTab));
   };
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (appRootRef.current?.requestFullscreen) await appRootRef.current.requestFullscreen();
+    } catch {
+      showToast("FULLSCREEN UNAVAILABLE IN THIS BROWSER");
+    }
+  };
   const buyPrestigeCapacity = (kind: HelperId) => {
     const current = stateRef.current;
     const next = upgradeCapacity(current, kind);
@@ -210,7 +232,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen h-dvh justify-center overflow-hidden bg-[#05030f] font-mono text-white select-none">
+    <div ref={appRootRef} className="flex h-screen h-dvh justify-center overflow-hidden bg-[#05030f] font-mono text-white select-none">
       <div className="relative flex h-full min-h-0 w-full max-w-[400px] flex-col bg-[#08041a]">
         {scanlines && (
           <div
@@ -294,6 +316,9 @@ export default function App() {
             <OptionsPanel
               scanlines={scanlines}
               buzz={buzz}
+              fullscreen={fullscreen}
+              fullscreenAvailable={fullscreenAvailable}
+              onToggleFullscreen={toggleFullscreen}
               resetStep={resetStep}
               onToggleScanlines={() => setScanlines(v => !v)}
               onToggleBuzz={() => setBuzz(v => !v)}

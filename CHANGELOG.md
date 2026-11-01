@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.20 - Organic plasma and compact game UX
+
+- Reduce new-run helper limits to 30 Fingers, 25 Big Toes, 20 Ghost Hands and 15 Stickmen
+- Use smaller +10 / +5 / +5 / +3 Sparks capacity upgrades; retain earned upgrades and current owned helpers in existing saves
+- Normalize previously stored default 0.12.19 capacity without deleting hired helpers; next Prestige resets temporary grandfathered limits
+- Add a user-gesture fullscreen toggle in Options when the browser supports the Fullscreen API; Escape and browser changes update state
+- Replace full-screen Welcome Back takeover with a compact, scroll-safe return card and 45% backdrop
+- Rework pixel plasma into seeded, coherent, irregular branches with short offshoots, warmer glass rim, subtle idle filaments and layered electrode glow
+- Keep all plasma production, helper rendering, save keys and the two-step save reset behavior unchanged
+- Add migration, procedural arc, fullscreen and return-dialog regression tests
+
 ## 0.12.19 — Prestige foundations and safer Settings
 
 - Add fourth PRESTIGE main tab with a visible reward preview and two-step confirmation before a run reset
