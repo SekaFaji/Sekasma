@@ -9,16 +9,18 @@ import WelcomeBack, { type WelcomeSummary } from "./components/WelcomeBack";
 import UpgradePanel, { type UpTab } from "./components/UpgradePanel";
 import type { BuyQuantity } from "./components/UpgradeRow";
 import StatsPanel from "./components/StatsPanel";
-import OptionsPanel from "./components/OptionsPanel";
+import OptionsPanel, { type ResetStep } from "./components/OptionsPanel";
+import PrestigePanel, { type PrestigeConfirmStep } from "./components/PrestigePanel";
 import { GAS_LIST, gasById, nextGas } from "./game/gases";
 import { accrueIdle, accrueOffline, bulkCost, buyMsg, cappedOfflineSeconds, cracklePower, idleRate, purchaseUpgrade } from "./game/economy";
 import type { BuyKind } from "./game/economy";
 import { freshSave, loadOpts, loadSave, persist, resetSave, saveOpts } from "./game/save";
 import { measureTick } from "./game/timing";
 import { haptic } from "./utils/haptic";
-import type { GasId, GameState } from "./game/types";
+import type { GasId, GameState, HelperId } from "./game/types";
+import { performPrestige, prestigeReward, upgradeCapacity } from "./game/prestige";
 
-type Tab = "upgrades" | "stats" | "options";
+type Tab = "upgrades" | "stats" | "prestige" | "options";
 
 export default function App() {
   const [state, setState] = useState<GameState>(() => loadSave() ?? freshSave());
@@ -33,7 +35,8 @@ export default function App() {
   const toastT = useRef<number | undefined>(undefined);
   const panelScrollRef = useRef<HTMLDivElement | null>(null);
   const scrollPositionsRef = useRef<Record<string, number>>({});
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetStep, setResetStep] = useState<ResetStep>(0);
+  const [prestigeStep, setPrestigeStep] = useState<PrestigeConfirmStep>(0);
   const stateRef = useRef(state);
   const restored = useRef(false);
   stateRef.current = state;
@@ -161,8 +164,44 @@ export default function App() {
   const switchMainTab = (next: Tab) => {
     rememberScroll();
     setTab(next);
-    setConfirmReset(false);
+    setResetStep(0);
+    setPrestigeStep(0);
     restoreScroll(viewKey(next, upTab));
+  };
+  const buyPrestigeCapacity = (kind: HelperId) => {
+    const current = stateRef.current;
+    const next = upgradeCapacity(current, kind);
+    if (next === current) return;
+    stateRef.current = next;
+    setState(next);
+    setSaveWarning(!persist(next));
+    buzzNow(9);
+    showToast("PERMANENT CAPACITY UPGRADED");
+  };
+  const confirmPrestige = () => {
+    if (prestigeStep !== 2) return;
+    const current = stateRef.current;
+    if (prestigeReward(current) === 0) return;
+    const next = performPrestige(current);
+    stateRef.current = next;
+    setState(next);
+    setSaveWarning(!persist(next));
+    setPrestigeStep(0);
+    setWelcome(null);
+    setQuantities({});
+    buzzNow(18);
+    showToast("PRESTIGE COMPLETE · SPARKS EARNED");
+  };
+  const confirmSaveDeletion = () => {
+    if (resetStep !== 2) return;
+    const fresh = resetSave();
+    stateRef.current = fresh;
+    setState(fresh);
+    setWelcome(null);
+    setQuantities({});
+    setToast(null);
+    setResetStep(0);
+    setPrestigeStep(0);
   };
   const switchUpgradeTab = (next: UpTab) => {
     rememberScroll();
@@ -209,10 +248,11 @@ export default function App() {
         </div>
 
         {/* tab bar */}
-        <nav aria-label="Main sections" className="grid grid-cols-3 border-t border-white/20 bg-[#120a2e]">
+        <nav aria-label="Main sections" className="grid grid-cols-4 border-t border-white/20 bg-[#120a2e]">
           {([
             ["upgrades", "UPGRADES"],
             ["stats", "STATS"],
+            ["prestige", "PRESTIGE"],
             ["options", "OPTIONS"],
           ] as [Tab, string][]).map(([id, label]) => (
             <button
@@ -242,25 +282,25 @@ export default function App() {
           {tab === "stats" && (
             <StatsPanel state={state} unlockedGases={unlockedGases} rates={rates} />
           )}
+          {tab === "prestige" && (
+            <PrestigePanel state={state} step={prestigeStep}
+              onStart={() => setPrestigeStep(1)}
+              onNext={() => setPrestigeStep(2)}
+              onCancel={() => setPrestigeStep(0)}
+              onConfirm={confirmPrestige}
+              onBuyCapacity={buyPrestigeCapacity} />
+          )}
           {tab === "options" && (
             <OptionsPanel
               scanlines={scanlines}
               buzz={buzz}
-              confirmReset={confirmReset}
-              onToggleScanlines={() => setScanlines((v) => !v)}
-              onToggleBuzz={() => setBuzz((v) => !v)}
-              onCancelReset={() => setConfirmReset(false)}
-              onReset={() => {
-                if (confirmReset) {
-                  const fresh = resetSave();
-                  stateRef.current = fresh;
-                  setState(fresh);
-                  setWelcome(null);
-                  setQuantities({});
-                  setToast(null);
-                  setConfirmReset(false);
-                } else setConfirmReset(true);
-              }}
+              resetStep={resetStep}
+              onToggleScanlines={() => setScanlines(v => !v)}
+              onToggleBuzz={() => setBuzz(v => !v)}
+              onStartReset={() => setResetStep(1)}
+              onNextReset={() => setResetStep(2)}
+              onCancelReset={() => setResetStep(0)}
+              onConfirmReset={confirmSaveDeletion}
             />
           )}
           </div>
