@@ -7,6 +7,7 @@ import { measureTick } from "../src/game/timing.ts";
 import { visibleHelperCount, visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../src/render/limits.ts";
 import { advanceStickman, createStickman } from "../src/render/stickmen.ts";
 import { PX, CX, CY, R } from "../src/render/geometry.ts";
+import { plasmaDisplacement } from "../src/render/plasma.ts";
 import { BASE_CAPACITY, CAPACITY_STEP, capacityUpgradeCost, helperCapacity, helperRoom, performPrestige, prestigeReward, runPrestigeScore, upgradeCapacity } from "../src/game/prestige.ts";
 
 test("offline settlement is capped and handles negative time", () => {
@@ -411,4 +412,18 @@ test("a fully capped helper purchase is blocked, but lifetime earning remains un
   assert.equal(bulkCost(s, "finger", undefined, 5).count, 0);
   assert.strictEqual(purchaseUpgrade(s, "finger", undefined, 1).state, s);
   assert.ok(accrueIdle(s, 10).gain.neon > 0);
+});
+
+
+test("plasma noise is deterministic, organically varied and pinned to endpoints", () => {
+  assert.equal(plasmaDisplacement(0, 2, 3, 4, 1), 0);
+  assert.equal(plasmaDisplacement(1, 2, 3, 4, 1), 0);
+  const first = Array.from({ length: 20 }, (_, i) => plasmaDisplacement((i + 1) / 21, 2, 3, 4, 1));
+  const identical = Array.from({ length: 20 }, (_, i) => plasmaDisplacement((i + 1) / 21, 2, 3, 4, 1));
+  assert.deepEqual(first, identical);
+  assert.ok(new Set(first.map(x => x.toFixed(2))).size > 10);
+  const otherArc = Array.from({ length: 20 }, (_, i) => plasmaDisplacement((i + 1) / 21, 2, 8, 4, 1));
+  assert.notDeepEqual(first, otherArc);
+  const nearbyFrame = plasmaDisplacement(0.4, 2.01, 3, 4, 1);
+  assert.ok(Math.abs(nearbyFrame - plasmaDisplacement(0.4, 2, 3, 4, 1)) < 1);
 });
