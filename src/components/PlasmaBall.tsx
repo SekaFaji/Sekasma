@@ -114,11 +114,12 @@ export default function PlasmaBall({
             const d = Math.hypot(x - CX, y - CY);
             if (d > R) continue;
             const band = d / R;
-            b.fillStyle = band < 0.4
-              ? lit ? "#2e1a5e" : "#170f36"
+            // Deep navy glass lets thin white-blue arcs and pink flashes stand out.
+            b.fillStyle = band < 0.25
+              ? lit ? "#29133d" : "#1e102f"
               : band < 0.8
-              ? lit ? "#1f1250" : "#0f0a2c"
-              : lit ? "#160e3c" : "#0a0622";
+              ? lit ? "#180b30" : "#100922"
+              : lit ? "#160a2b" : "#0a061c";
             b.fillRect(x, y, 1, 1);
           }
         // electrode stem from base to center
@@ -145,8 +146,14 @@ export default function PlasmaBall({
           const px = Math.round(CX + Math.cos(a) * R);
           const py = Math.round(CY + Math.sin(a) * R);
           const bright = a > Math.PI * 1.05 && a < Math.PI * 1.5;
-          b.fillStyle = bright ? (lit ? "#b7b2ff" : "#8f8bd8") : lit ? "#5d57a0" : "#4a4473";
+          b.fillStyle = bright ? (lit ? "#d0a5e7" : "#997fb9") : lit ? "#aa4e93" : "#694070";
           b.fillRect(px, py, 1, 1);
+          // Sparse magenta hotspots echo the uneven ionized rim of a real globe.
+          if (i % 9 === 0) {
+            b.fillStyle = lit ? "#f875b7" : "#9a527f";
+            b.fillRect(Math.round(CX + Math.cos(a) * (R - 2)),
+              Math.round(CY + Math.sin(a) * (R - 2)), 1, 1);
+          }
         }
         // fixed specular highlight, top-left
         b.globalAlpha = lit ? 0.35 : 0.22;
@@ -380,6 +387,19 @@ export default function PlasmaBall({
       }
       ctx.globalAlpha = 1;
 
+      // Low-energy ambient filaments keep an untouched globe quietly alive.
+      // They are visual only and never grant passive income.
+      if (!held) {
+        const ambient = 2 + Math.min(2, u.length);
+        for (let i = 0; i < ambient; i++) {
+          const ang = i * 2.399963 + t * 0.08 +
+            Math.sin(t * 0.51 + i * 1.41) * 0.35;
+          const reach = R * (0.6 + 0.18 * Math.sin(t * 0.73 + i * 1.27));
+          drawPlasmaArc(ctx, CX, CY, CX + Math.cos(ang) * reach,
+            CY + Math.sin(ang) * reach, u[i % u.length], t, i * 4.37, 2.4, 0.5, 0.35);
+        }
+      }
+
       // ---- ghost hands press from INSIDE the glass ----
       let ghostHold: { ang: number } | null = null;
       const gho = visibleGhosts;
@@ -534,14 +554,17 @@ export default function PlasmaBall({
       // ---- electrode ----
       const primary = u[u.length - 1];
       const pulse = 0.75 + Math.sin(t * 2) * 0.25;
-      ctx.globalAlpha = held ? 1 : pulse;
+      // Layer the central electrode: pink halo, colored ion shell, hot core.
+      ctx.globalAlpha = (held ? 0.85 : 0.55) * pulse;
+      ctx.fillStyle = "#e548a8";
+      ctx.fillRect(CX - 5, CY - 4, 11, 9);
+      ctx.globalAlpha = held ? 0.95 : 0.77;
+      ctx.fillStyle = primary.glow;
+      ctx.fillRect(CX - 3, CY - 3, 7, 7);
       ctx.fillStyle = primary.core;
       ctx.fillRect(CX - 2, CY - 2, 5, 5);
-      ctx.fillStyle = primary.glow;
-      ctx.fillRect(CX - 3, CY - 1, 1, 3);
-      ctx.fillRect(CX + 3, CY - 1, 1, 3);
-      ctx.fillRect(CX - 1, CY - 3, 3, 1);
-      ctx.fillRect(CX - 1, CY + 3, 3, 1);
+      ctx.fillStyle = "#fff2fd";
+      ctx.fillRect(CX - 1, CY - 1, 2, 2);
       ctx.globalAlpha = 1;
 
       // Draw every Finger and Toe in full color, including the back-facing ones.
