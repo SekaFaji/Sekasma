@@ -6,51 +6,100 @@
 import { PX, CX, CY, R } from "./geometry";
 import { GHOST_PALETTE } from "./palette";
 
-// slimmer + longer, like a human finger
+/**
+ * Hand-pixeled, anatomically proportioned helpers.
+ * Each character = one logical pixel; '.' = transparent.
+ * 0 outline, 1 lit skin, 2 side shadow, 3 midtone,
+ * 4 nail bed, 5 nail glint, 6 nail edge, 7 knuckle crease,
+ * 8 warm highlight, 9 plasma-lit contact pixel.
+ *
+ * Upright sprites point toward the top of the frame. The orbital renderer
+ * rotates cached versions once; no filtering or external image assets.
+ */
 export const FINGER_SPRITE = [
-  ".000.",
-  "02220",
-  "02220",
-  "01110",
-  "01110",
-  "01110",
-  "01110",
-  "01110",
-  "01110",
-  "01110",
-  "01310",
-  "03130",
-  ".000.",
+  "...0000...",
+  "..011110..",
+  ".01555510.",
+  ".01644410.",
+  ".01644410.",
+  ".01666610.",
+  ".02881310.",
+  ".02181310.",
+  ".02113310.",
+  ".02771310.",
+  ".02113310.",
+  ".02113310.",
+  ".02117710.",
+  ".02113310.",
+  ".02113310.",
+  ".02113310.",
+  ".02113310.",
+  "..000000..",
 ];
 
-// the BIG TOE: the old, chunkier digit art (approved v3 finger look)
+// Contact is a different hand-pixeled pose, not merely a translated sprite:
+// the distal joint bends toward the glass, with a faint ionized highlight.
+export const FINGER_PRESS_SPRITE = [
+  "..0000....",
+  ".015510...",
+  "01555510..",
+  "01644410..",
+  "01644410..",
+  ".0166610..",
+  "..028910..",
+  "..021310..",
+  ".0277310..",
+  ".02113310.",
+  ".02113310.",
+  ".02113310.",
+  ".02117710.",
+  ".02113310.",
+  ".02113310.",
+  ".02113310.",
+  ".02113310.",
+  "..000000..",
+];
+
+// The big toe has a wider, flatter nail plate and narrows at its base.
 export const FOOT_SPRITE = [
-  ".00000.",
-  "0122210",
-  "0122210",
-  "0122210",
-  "0111110",
-  "0111110",
-  "0111110",
-  ".01110.",
-  ".01110.",
-  "..000..",
+  "....0000....",
+  "..00111100..",
+  ".0188888810.",
+  ".0166666610.",
+  ".0155555510.",
+  ".0144444510.",
+  ".0166666610.",
+  ".0211883310.",
+  ".0211113310.",
+  ".0211773310.",
+  "..02113310..",
+  "..02113310..",
+  "...0213100..",
+  "...021110...",
+  "....0000....",
 ];
 
-export const PLAYER_FINGER = [
-  "..00000..",
-  ".0222220.",
-  ".0222220.",
-  ".0222220.",
-  "001111100",
-  "011111110",
-  "011131310",
-  ".0131310.",
-  ".0313130.",
-  ".0313130.",
-  "..031310.",
-  "...0000..",
+// A squat, slightly flattened contact pose gives the big toe a heavy press.
+export const FOOT_PRESS_SPRITE = [
+  "...000000...",
+  "..01111100..",
+  ".0188888810.",
+  ".0166666610.",
+  ".0155555510.",
+  ".0144444510.",
+  ".0166666610.",
+  ".0211993310.",
+  ".0211773310.",
+  "..02113310..",
+  "..02113310..",
+  "..02113310..",
+  "...0213100..",
+  "...021110...",
+  "....0000....",
 ];
+
+// The same anatomical design for the player's manual touch.
+export const PLAYER_FINGER = FINGER_PRESS_SPRITE;
 
 // the ghost hand: reaches from the electrode, fingers toward the glass
 export const GHOST_SPRITE = [
@@ -115,7 +164,9 @@ export function sprOrients8(spr: string[]): string[][] {
   return [q[0], rot45(q[0]), q[1], rot45(q[1]), q[2], rot45(q[2]), q[3], rot45(q[3])];
 }
 export const FINGER_ORIENTS = sprOrients8(FINGER_SPRITE);
+export const FINGER_PRESS_ORIENTS = sprOrients8(FINGER_PRESS_SPRITE);
 export const FOOT_ORIENTS = sprOrients8(FOOT_SPRITE);
+export const FOOT_PRESS_ORIENTS = sprOrients8(FOOT_PRESS_SPRITE);
 export const GHOST_ORIENTS = sprOrients8(GHOST_SPRITE);
 
 /** Rasterize repeated pixel sprites only once, then blit cached bitmaps.
@@ -156,10 +207,11 @@ export function drawOriented(
   press: number,
   palette: Record<string, string>,
   orbitRadius = R - 1,
+  pressOrients?: string[][],
 ) {
   const inwardA = angle + Math.PI;
   const idx = ((Math.round((inwardA + Math.PI / 2) / (Math.PI / 4)) % 8) + 8) % 8;
-  const spr = orients[idx];
+  const spr = press > 0.4 && pressOrients ? pressOrients[idx] : orients[idx];
   const w = spr[0].length;
   const h = spr.length;
   const len = Math.max(w, h);
