@@ -4,10 +4,11 @@
  */
 import { GAS_LIST } from "./gases.ts";
 import { MAX_VOLT_STEPS, SPLIT_CAP, VOLT_STEP, zero3 } from "./config.ts";
-import type { GasId, GameState } from "./types.ts";
+import type { GasId, GameState, HelperId, HelperRecord, PrestigeProgress } from "./types.ts";
+import { BASE_CAPACITY, HELPERS, freshPrestige } from "./prestige.ts";
 
 export const SAVE_KEY = "idle-plasma-ball-save-v10";
-// Keep existing save keys stable for old installs. The internal schema is v14.
+// Keep existing save keys stable for old installs. The internal schema is v15.
 export const BACKUP_KEY = "idle-plasma-ball-save-backup-v12";
 export const LEGACY_V9_KEY = "idle-plasma-ball-save-v9";
 export const LEGACY_V8_KEY = "idle-plasma-ball-save-v8";
@@ -34,6 +35,7 @@ export function freshSave(): GameState {
     voltage: zero3(), fingers: 0, toes: 0, ghosts: 0, stickmen: 0,
     filaments: zero3(), splits: zero3(), unlocked: ["neon"],
     created: now, lastSeen: now, activeSeconds: 0, offlineSeconds: 0,
+    prestige: freshPrestige(),
   };
 }
 
@@ -65,6 +67,31 @@ function sanitizeSave(s: GameState): GameState {
     voltage[g.id] = Math.floor(voltage[g.id]);
     splits[g.id] = Math.floor(splits[g.id]);
   }
+  const rawPrestige: Partial<PrestigeProgress> = s.prestige && typeof s.prestige === "object"
+    ? s.prestige : {};
+  const capacityRecord = (value: unknown, fallback: HelperRecord): HelperRecord => {
+    const input = value && typeof value === "object" ? value as Partial<Record<HelperId, unknown>> : {};
+    return Object.fromEntries(HELPERS.map(kind => [kind,
+      Math.floor(validNumber(input[kind], fallback[kind]))])) as HelperRecord;
+  };
+  const original = freshPrestige();
+  const originalCap = capacityRecord(rawPrestige.legacyCapacity, BASE_CAPACITY);
+  // Existing ownership is grandfathered, even for saves from older releases.
+  const legacyCapacity = { ...originalCap };
+  for (const [kind, owned] of [
+    ["finger", s.fingers], ["toe", s.toes], ["ghost", s.ghosts], ["stickman", s.stickmen],
+  ] as [HelperId, number][]) {
+    legacyCapacity[kind] = Math.max(BASE_CAPACITY[kind], originalCap[kind], Math.floor(validNumber(owned)));
+  }
+  const lastTotal = record(rawPrestige.lastTotal);
+  const prestige: PrestigeProgress = {
+    cycles: Math.floor(validNumber(rawPrestige.cycles)),
+    sparks: Math.floor(validNumber(rawPrestige.sparks)),
+    lifetimeSparks: Math.floor(validNumber(rawPrestige.lifetimeSparks)),
+    capacityLevels: capacityRecord(rawPrestige.capacityLevels, original.capacityLevels),
+    legacyCapacity,
+    lastTotal,
+  };
   return {
     plasma: record(s.plasma), total: record(s.total),
     crackles: Math.floor(validNumber(s.crackles)),
@@ -77,6 +104,7 @@ function sanitizeSave(s: GameState): GameState {
     lastSeen: validNumber(s.lastSeen, fallback.lastSeen),
     activeSeconds: validNumber(s.activeSeconds),
     offlineSeconds: validNumber(s.offlineSeconds),
+    prestige,
   };
 }
 
@@ -84,7 +112,7 @@ function sanitizeSave(s: GameState): GameState {
 export function migrateSave(old: Record<string, unknown>): GameState {
   const base = freshSave();
   // v10 / v9 saves: load as-is (v9 predates splits)
-  if (old.v === 14 || old.v === 13 || old.v === 12 || old.v === 11 || old.v === 10 || old.v === 9) {
+  if (old.v === 15 || old.v === 14 || old.v === 13 || old.v === 12 || old.v === 11 || old.v === 10 || old.v === 9) {
     const s = { ...base, ...(old as unknown as GameState) };
     if (!s.splits) s.splits = zero3();
     if (typeof s.ghosts !== "number") s.ghosts = 0;
@@ -168,7 +196,7 @@ export function persist(s: GameState): boolean {
         // Leave the existing backup untouched.
       }
     }
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 14 }));
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 15 }));
     return true;
   } catch {
     // No storage (e.g. private browsing): retain the in-memory session.
