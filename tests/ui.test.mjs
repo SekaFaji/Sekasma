@@ -187,8 +187,8 @@ test("compact welcome-back displays time away and actual earned gases, including
     summary: { seconds: 1800, gain: plasma(0) }, onContinue() {},
   }));
   assert.match(zero, /aria-modal="true"/);
-  assert.match(zero, /max-w-\\[320px\\]/);
-  assert.match(zero, /bg-\\[#050310\\]\\/45/);
+  assert.ok(zero.includes("max-w-[320px]"));
+  assert.ok(zero.includes("bg-[#050310]/45"));
   assert.match(zero, /WELCOME BACK/);
   assert.match(zero, /30M/);
   assert.match(zero, /NO PLASMA EARNED/);
