@@ -15,6 +15,7 @@ let CurrencyHeader;
 let SekasmaLogo;
 let WelcomeBack;
 let StatsPanel;
+let PrestigePanel;
 
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: "custom", logLevel: "error" });
@@ -26,6 +27,7 @@ before(async () => {
   ({ default: SekasmaLogo } = await server.ssrLoadModule("/src/components/SekasmaLogo.tsx"));
   ({ default: WelcomeBack } = await server.ssrLoadModule("/src/components/WelcomeBack.tsx"));
   ({ default: StatsPanel } = await server.ssrLoadModule("/src/components/StatsPanel.tsx"));
+  ({ default: PrestigePanel } = await server.ssrLoadModule("/src/components/PrestigePanel.tsx"));
 });
 after(async () => { if (server) await server.close(); });
 
@@ -78,8 +80,8 @@ test("app renders navigation and upgrade cards with genuine React markup", () =>
 
 test("settings show a neutral initial reset action and accessible pressed states", () => {
   const html = renderToStaticMarkup(React.createElement(OptionsPanel, {
-    scanlines: true, buzz: false, confirmReset: false,
-    onToggleScanlines() {}, onToggleBuzz() {}, onReset() {}, onCancelReset() {},
+    scanlines: true, buzz: false, resetStep: 0,
+    onToggleScanlines() {}, onToggleBuzz() {}, onStartReset() {}, onNextReset() {}, onConfirmReset() {}, onCancelReset() {},
   }));
   assert.match(html, /aria-pressed="true"/);
   assert.match(html, /aria-pressed="false"/);
@@ -89,12 +91,12 @@ test("settings show a neutral initial reset action and accessible pressed states
 
 test("reset confirmation offers distinct cancel and confirm actions", () => {
   const html = renderToStaticMarkup(React.createElement(OptionsPanel, {
-    scanlines: true, buzz: true, confirmReset: true,
-    onToggleScanlines() {}, onToggleBuzz() {}, onReset() {}, onCancelReset() {},
+    scanlines: true, buzz: true, resetStep: 1,
+    onToggleScanlines() {}, onToggleBuzz() {}, onStartReset() {}, onNextReset() {}, onConfirmReset() {}, onCancelReset() {},
   }));
   assert.match(html, /RESET ALL SAVED PROGRESS/);
   assert.match(html, /CANCEL/);
-  assert.match(html, /CONFIRM RESET/);
+  assert.match(html, /CONFIRM 1 OF 2/);
   assert.match(html, /role="group"/);
 });
 
@@ -310,8 +312,8 @@ test("Stats groups general information separately and uses four-card rows everyw
 
 test("Options displays verified SekaFaji GitHub, Games Discord and YouTube links", () => {
   const html = renderToStaticMarkup(React.createElement(OptionsPanel, {
-    scanlines: true, buzz: false, confirmReset: false,
-    onToggleScanlines() {}, onToggleBuzz() {}, onReset() {}, onCancelReset() {},
+    scanlines: true, buzz: false, resetStep: 0,
+    onToggleScanlines() {}, onToggleBuzz() {}, onStartReset() {}, onNextReset() {}, onConfirmReset() {}, onCancelReset() {},
   }));
   for (const [name, url] of [
     ["GITHUB", "https://github.com/SekaFaji"],
@@ -375,4 +377,42 @@ test("upgrade tabs appear in requested HELP, POWER, GAS order", async () => {
     assert.deepEqual(labels, ["HELP", "POWER", "GAS"]);
     assert.equal((html.match(/aria-selected="true"/g) ?? []).length, 1);
   }
+});
+
+test("Settings requires two separate confirmations before final save deletion", () => {
+  const props = {
+    scanlines: true, buzz: true,
+    onToggleScanlines() {}, onToggleBuzz() {}, onStartReset() {},
+    onNextReset() {}, onConfirmReset() {}, onCancelReset() {},
+  };
+  const first = renderToStaticMarkup(React.createElement(OptionsPanel, { ...props, resetStep: 1 }));
+  const final = renderToStaticMarkup(React.createElement(OptionsPanel, { ...props, resetStep: 2 }));
+  assert.match(first, /CONFIRM 1 OF 2/);
+  assert.doesNotMatch(first, /DELETE SAVE · FINAL/);
+  assert.match(final, /FINAL WARNING/);
+  assert.match(final, /DELETE SAVE · FINAL/);
+  assert.match(final, /CANCEL/);
+  assert.match(final, /PRESTIGE/);
+  assert.match(final, /SAVE MANAGEMENT/);
+});
+
+test("App has four main tabs including Prestige", () => {
+  const html = renderToStaticMarkup(React.createElement(App));
+  for (const tab of ["UPGRADES", "STATS", "PRESTIGE", "OPTIONS"]) assert.match(html, new RegExp(tab));
+  assert.match(html, /grid grid-cols-4 border-t/);
+});
+
+test("Prestige displays permanent caps, rewards and two confirmation stages", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const state = freshSave();
+  const callbacks = { onStart() {}, onNext() {}, onCancel() {}, onConfirm() {}, onBuyCapacity() {} };
+  const initial = renderToStaticMarkup(React.createElement(PrestigePanel, { state, step: 0, ...callbacks }));
+  assert.match(initial, /PERMANENT HELPER CAPACITY/);
+  assert.match(initial, /PRESTIGE NOT READY/);
+  for (const name of ["FINGERS", "BIG TOES", "GHOST HANDS", "STICKMEN"]) assert.match(initial, new RegExp(name));
+  const stage1 = renderToStaticMarkup(React.createElement(PrestigePanel, { state, step: 1, ...callbacks }));
+  const stage2 = renderToStaticMarkup(React.createElement(PrestigePanel, { state, step: 2, ...callbacks }));
+  assert.match(stage1, /CONTINUE/);
+  assert.match(stage2, /FINAL CONFIRMATION/);
+  assert.match(stage2, /CONFIRM PRESTIGE/);
 });
