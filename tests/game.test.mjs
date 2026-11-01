@@ -304,18 +304,17 @@ test("all finger, toe, and stickman orbit rings fit inside the canvas without to
     for (let ring = 0; ring < 3; ring++) {
       const orbit = helperOrbitRadius(kind, ring, R);
       assert.ok(orbit > 0 && orbit < R);
-      // drawOriented adds half the oriented sprite length to the orbit anchor;
-      // use the 14px maximum of the baked 45-degree sprite.
-      const drawRadius = orbit + (kind === "stickmen" ? 0 : 7);
+      // The new anatomical sprites bake to at most 21x21 at 45 degrees.
+      // drawOriented places the center an additional half sprite away.
+      const spriteMax = kind === "stickmen" ? 0 : 21;
+      const furthest = orbit + spriteMax + (kind === "toes" ? 1 : 0);
       for (let step = 0; step < 360; step++) {
         const angle = (step * Math.PI) / 180;
-        const x = CX + Math.cos(angle) * drawRadius;
-        const y = CY + Math.sin(angle) * drawRadius;
-        const halfWidth = kind === "stickmen" ? 8 : 7;
-        const topHeight = kind === "stickmen" ? 10 : 7;
-        const bottomHeight = kind === "stickmen" ? 2 : 7;
-        assert.ok(x - halfWidth >= 0 && x + halfWidth < PX, `${kind} ring ${ring} x clipped`);
-        assert.ok(y - topHeight >= 0 && y + bottomHeight < PX, `${kind} ring ${ring} y clipped`);
+        const x = CX + Math.cos(angle) * furthest;
+        const y = CY + Math.sin(angle) * furthest;
+        const stickmanHalf = kind === "stickmen" ? 8 : 0;
+        assert.ok(x - stickmanHalf >= 0 && x + stickmanHalf < PX, `${kind} ring ${ring} x clipped`);
+        assert.ok(y - stickmanHalf >= 0 && y + stickmanHalf < PX, `${kind} ring ${ring} y clipped`);
       }
     }
   }
