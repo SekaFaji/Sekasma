@@ -8,11 +8,13 @@ import { HOLD_INTERVAL, PRESS_INTERVAL } from "../game/config";
 import { fmtShort } from "../utils/format";
 import { haptic } from "../utils/haptic";
 import { PX, CX, CY, R } from "../render/geometry";
-import { SKIN_PALETTE } from "../render/palette";
+import { SKIN_PALETTE, TOE_PALETTE } from "../render/palette";
 import {
   PLAYER_FINGER,
   FINGER_ORIENTS,
+  FINGER_PRESS_ORIENTS,
   FOOT_ORIENTS,
+  FOOT_PRESS_ORIENTS,
   drawSprite,
   drawOriented,
   drawGhost,
@@ -327,7 +329,8 @@ export default function PlasmaBall({
       const effectChance = helperEffectChance({ fingers: fing, toes: toe, ghosts: ghs, stickmen: stm });
       // ---- moving helpers spread across several concentric rings ----
       const runHelpers = (
-        seeds: { current: Wanderer[] }, count: number, orients: string[][],
+        seeds: { current: Wanderer[] }, count: number,
+        orients: string[][], contactOrients: string[][],
         kind: "fingers" | "toes",
       ) => {
         while (seeds.current.length < count) seeds.current.push(newWanderer(seeds.current.length, t));
@@ -348,10 +351,15 @@ export default function PlasmaBall({
               ripples.current.push({ x: tx, y: ty, age: 0, color: pickGas().color });
             }
           }
-          const since = t - (w.timer - PRESS_INTERVAL);
-          drawOriented(ctx, orients, angle,
-            Math.max(0, 1 - since / (kind === "toes" ? 0.35 : 0.3)),
-            SKIN_PALETTE, radius,
+          const since = Math.max(0, t - (w.timer - PRESS_INTERVAL));
+          // Quick fingertip jab versus the toe's longer, heavier compression.
+          // A distinct bent/flattened frame is rendered during contact.
+          const contact = Math.max(0, 1 - since / (kind === "toes" ? 0.38 : 0.23));
+          const beforeStrike = Math.max(0, 1 - Math.max(0, w.timer - t) / 0.15);
+          drawOriented(ctx, orients, angle, contact,
+            kind === "toes" ? TOE_PALETTE : SKIN_PALETTE,
+            radius + (kind === "toes" ? beforeStrike : 0),
+            contactOrients,
           );
         }
       };
@@ -568,8 +576,8 @@ export default function PlasmaBall({
       ctx.globalAlpha = 1;
 
       // Draw every Finger and Toe in full color, including the back-facing ones.
-      runHelpers(fingerSeeds, visibleFingers, FINGER_ORIENTS, "fingers");
-      runHelpers(toeSeeds, visibleToes, FOOT_ORIENTS, "toes");
+      runHelpers(fingerSeeds, visibleFingers, FINGER_ORIENTS, FINGER_PRESS_ORIENTS, "fingers");
+      runHelpers(toeSeeds, visibleToes, FOOT_ORIENTS, FOOT_PRESS_ORIENTS, "toes");
 
       // Independent roam/jump phases: small walkers circle the whole ball and
       // leap in to hit the glass. Effects are cosmetic; all owned helpers earn.
@@ -602,7 +610,9 @@ export default function PlasmaBall({
 
       // ---- your fingers on the glass (one sprite per touch) ----
       for (const [, p] of pts)
-        drawSprite(ctx, PLAYER_FINGER, Math.round(p.x) - 4, Math.round(p.y) - 2, SKIN_PALETTE);
+        drawSprite(ctx, PLAYER_FINGER,
+          Math.round(p.x) - Math.floor(PLAYER_FINGER[0].length / 2),
+          Math.round(p.y) - 3, SKIN_PALETTE);
 
       // ---- ripples ----
       ripples.current = ripples.current.filter((r) => r.age < 0.5);
