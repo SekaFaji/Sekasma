@@ -182,11 +182,13 @@ test("original HELP, GAS and POWER upgrades remain visible", async () => {
   for (const label of ["NEON ARC", "NEON VOLTS", "NEON SPLIT"]) assert.match(power, new RegExp(label));
 });
 
-test("welcome-back takeover displays time away and actual earned gases, including zero", () => {
+test("compact welcome-back displays time away and actual earned gases, including zero", () => {
   const zero = renderToStaticMarkup(React.createElement(WelcomeBack, {
     summary: { seconds: 1800, gain: plasma(0) }, onContinue() {},
   }));
   assert.match(zero, /aria-modal="true"/);
+  assert.match(zero, /max-w-\\[320px\\]/);
+  assert.match(zero, /bg-\\[#050310\\]\\/45/);
   assert.match(zero, /WELCOME BACK/);
   assert.match(zero, /30M/);
   assert.match(zero, /NO PLASMA EARNED/);
@@ -415,4 +417,27 @@ test("Prestige displays permanent caps, rewards and two confirmation stages", as
   assert.match(stage1, /CONTINUE/);
   assert.match(stage2, /FINAL CONFIRMATION/);
   assert.match(stage2, /CONFIRM PRESTIGE/);
+});
+
+
+test("fullscreen control is available only when the browser supports it and reflects state", () => {
+  const base = {
+    scanlines: true, buzz: true, resetStep: 0,
+    onToggleScanlines() {}, onToggleBuzz() {}, onToggleFullscreen() {},
+    onStartReset() {}, onNextReset() {}, onConfirmReset() {}, onCancelReset() {},
+  };
+  const available = renderToStaticMarkup(React.createElement(OptionsPanel, {
+    ...base, fullscreen: false, fullscreenAvailable: true,
+  }));
+  assert.match(available, /FULLSCREEN/);
+  assert.match(available, /HIDE BROWSER CHROME/);
+  const on = renderToStaticMarkup(React.createElement(OptionsPanel, {
+    ...base, fullscreen: true, fullscreenAvailable: true,
+  }));
+  assert.match(on, /FULLSCREEN/);
+  assert.match(on, /aria-pressed="true"/);
+  const unsupported = renderToStaticMarkup(React.createElement(OptionsPanel, {
+    ...base, fullscreen: false, fullscreenAvailable: false,
+  }));
+  assert.doesNotMatch(unsupported, /FULLSCREEN/);
 });
