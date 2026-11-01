@@ -322,6 +322,8 @@ test("all finger, toe, and stickman orbit rings fit inside the canvas without to
 });
 
 test("Prestige capacity starts independent for every helper", () => {
+  assert.deepEqual(BASE_CAPACITY, { finger: 30, toe: 25, ghost: 20, stickman: 15 });
+  assert.deepEqual(CAPACITY_STEP, { finger: 10, toe: 5, ghost: 5, stickman: 3 });
   const s = freshSave();
   assert.deepEqual(s.prestige.capacityLevels, { finger: 0, toe: 0, ghost: 0, stickman: 0 });
   for (const kind of ["finger", "toe", "ghost", "stickman"])
@@ -340,6 +342,23 @@ test("legacy ownership migrates without losing or locking hundreds of owned help
   assert.equal(s.fingers, 800);
   assert.equal(s.stickmen, 92);
   assert.equal(s.prestige.sparks, 0);
+});
+
+test("v15 old default helper caps shrink without deleting currently hired helpers", () => {
+  const old = freshSave();
+  old.prestige.legacyCapacity = { finger: 100, toe: 60, ghost: 40, stickman: 40 };
+  old.fingers = 38;
+  old.toes = 10;
+  const migrated = migrateSave({ ...old, v: 15 });
+  assert.equal(migrated.fingers, 38);
+  assert.equal(helperCapacity(migrated, "finger"), 38);
+  assert.equal(helperCapacity(migrated, "toe"), 25);
+  const ready = { ...migrated, unlocked: ["neon", "argon", "xenon", "krypton"],
+    total: { ...migrated.total, krypton: 2000 } };
+  const restarted = performPrestige(ready);
+  assert.equal(restarted.fingers, 0);
+  assert.deepEqual(restarted.prestige.legacyCapacity, BASE_CAPACITY);
+  assert.equal(helperCapacity(restarted, "finger"), 30);
 });
 
 test("Sparks buy permanent individual capacity without mutating existing ownership", () => {
