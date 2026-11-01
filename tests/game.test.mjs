@@ -7,6 +7,7 @@ import { measureTick } from "../src/game/timing.ts";
 import { visibleHelperCount, visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../src/render/limits.ts";
 import { advanceStickman, createStickman } from "../src/render/stickmen.ts";
 import { PX, CX, CY, R } from "../src/render/geometry.ts";
+import { BASE_CAPACITY, CAPACITY_STEP, capacityUpgradeCost, helperCapacity, helperRoom, performPrestige, prestigeReward, runPrestigeScore, upgradeCapacity } from "../src/game/prestige.ts";
 
 test("offline settlement is capped and handles negative time", () => {
   assert.equal(cappedOfflineSeconds(0, 86400000), OFFLINE_CAP_S);
@@ -318,4 +319,77 @@ test("all finger, toe, and stickman orbit rings fit inside the canvas without to
     }
   }
   assert.ok(CY + R + 14 < PX); // oversized pedestal still fits below the sphere
+});
+
+test("Prestige capacity starts independent for every helper", () => {
+  const s = freshSave();
+  assert.deepEqual(s.prestige.capacityLevels, { finger: 0, toe: 0, ghost: 0, stickman: 0 });
+  for (const kind of ["finger", "toe", "ghost", "stickman"])
+    assert.equal(helperCapacity(s, kind), BASE_CAPACITY[kind]);
+  const wealthy = { ...s, plasma: { neon: 1e30, argon: 1e30, xenon: 1e30, krypton: 1e30 } };
+  assert.equal(bulkCost(wealthy, "finger", undefined, 1000).count, BASE_CAPACITY.finger);
+  assert.equal(bulkCost(wealthy, "toe", undefined, 1000).count, BASE_CAPACITY.toe);
+});
+
+test("legacy ownership migrates without losing or locking hundreds of owned helpers", () => {
+  const legacy = { ...freshSave(), v: 14, prestige: undefined,
+    fingers: 800, toes: 160, ghosts: 55, stickmen: 92 };
+  const s = migrateSave(legacy);
+  for (const [kind, owned] of [["finger", 800], ["toe", 160], ["ghost", 55], ["stickman", 92]])
+    assert.ok(helperCapacity(s, kind) >= owned, kind);
+  assert.equal(s.fingers, 800);
+  assert.equal(s.stickmen, 92);
+  assert.equal(s.prestige.sparks, 0);
+});
+
+test("Sparks buy permanent individual capacity without mutating existing ownership", () => {
+  const s = { ...freshSave(), prestige: { ...freshSave().prestige, sparks: 12 } };
+  assert.equal(capacityUpgradeCost(s, "finger"), 1);
+  const raised = upgradeCapacity(s, "finger");
+  assert.equal(helperCapacity(raised, "finger"), BASE_CAPACITY.finger + CAPACITY_STEP.finger);
+  assert.equal(helperCapacity(raised, "toe"), BASE_CAPACITY.toe);
+  assert.equal(raised.prestige.sparks, 11);
+  assert.equal(capacityUpgradeCost(raised, "finger"), 4);
+  assert.equal(s.prestige.sparks, 12);
+  const poor = { ...raised, prestige: { ...raised.prestige, sparks: 0 } };
+  assert.strictEqual(upgradeCapacity(poor, "toe"), poor);
+});
+
+test("prestige preserves lifetime statistics, permanent capacities and spendable Sparks", () => {
+  const old = freshSave();
+  old.unlocked = ["neon", "argon", "xenon", "krypton"];
+  old.fingers = 60; old.toes = 20;
+  old.plasma.krypton = 5500; old.total.krypton = 25000;
+  old.crackles = 1234; old.activeSeconds = 7200; old.offlineSeconds = 3600;
+  old.prestige.sparks = 2;
+  old.prestige.capacityLevels.finger = 2;
+  const gain = prestigeReward(old);
+  assert.ok(gain > 0);
+  assert.ok(runPrestigeScore(old) > 100000);
+  const next = performPrestige(old);
+  assert.equal(next.prestige.cycles, 1);
+  assert.equal(next.prestige.sparks, 2 + gain);
+  assert.equal(next.prestige.capacityLevels.finger, 2);
+  assert.deepEqual(next.unlocked, ["neon"]);
+  assert.equal(next.fingers, 0);
+  assert.equal(next.toes, 0);
+  assert.equal(next.plasma.krypton, 0);
+  assert.equal(next.total.krypton, 25000);
+  assert.equal(next.crackles, 1234);
+  assert.equal(next.activeSeconds, 7200);
+  assert.equal(next.offlineSeconds, 3600);
+  assert.equal(next.prestige.lastTotal.krypton, 25000);
+  // A second claim without earning more and unlocking Krypton is impossible.
+  assert.strictEqual(performPrestige(next), next);
+  assert.equal(prestigeReward(next), 0);
+});
+
+test("a fully capped helper purchase is blocked, but lifetime earning remains unchanged", () => {
+  const s = freshSave();
+  s.fingers = BASE_CAPACITY.finger;
+  s.plasma.neon = 1e9;
+  assert.equal(helperRoom(s, "finger"), 0);
+  assert.equal(bulkCost(s, "finger", undefined, 5).count, 0);
+  assert.strictEqual(purchaseUpgrade(s, "finger", undefined, 1).state, s);
+  assert.ok(accrueIdle(s, 10).gain.neon > 0);
 });

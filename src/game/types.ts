@@ -15,6 +15,16 @@ export type Gas = {
   unlockCost: Partial<Record<GasId, number>>;
 };
 export type GasRecord = Record<GasId, number>;
+export type HelperId = "finger" | "toe" | "ghost" | "stickman";
+export type HelperRecord = Record<HelperId, number>;
+export type PrestigeProgress = {
+  cycles: number;
+  sparks: number;
+  lifetimeSparks: number;
+  capacityLevels: HelperRecord;
+  legacyCapacity: HelperRecord;
+  lastTotal: GasRecord;
+};
 
 export type GameState = {
   plasma: GasRecord; // one currency per gas
@@ -32,4 +42,5 @@ export type GameState = {
   lastSeen: number;
   activeSeconds: number; // cumulative visible/foreground playtime
   offlineSeconds: number; // capped time away, tracked starting with schema 13
+  prestige: PrestigeProgress;
 };

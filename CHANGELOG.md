@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.12.19 — Prestige foundations and safer Settings
+
+- Add fourth PRESTIGE main tab with a visible reward preview and two-step confirmation before a run reset
+- Introduce permanent Sparks earned by prestiging after unlocking Krypton and producing enough weighted plasma
+- Spend Sparks to increase independent Finger, Big Toe, Ghost Hand and Stickman hiring capacity
+- Grandfather existing ownership when migrating old saves: no owned helpers are deleted
+- Keep lifetime earnings, playtime, crackles, Sparks and permanent capacity when prestiging; reset gas unlocks, balances, helper purchases and power upgrades
+- Calculate repeat-run reward from production since the last Prestige, avoiding reclaims of lifetime earnings
+- Redesign OPTIONS as Display & Feedback, Community and Save Management
+- Require two deliberate and cancellable confirmations for DELETE SAVE, including permanent Prestige data
+- Update save schema to v15 without changing the old storage key; protect data through tests
+
+
 ## 0.12.18 — Proper helper orbits and upgrade tab order
 
 - Reorder upgrade subtabs to HELP → POWER → GAS without changing content or unlock behavior

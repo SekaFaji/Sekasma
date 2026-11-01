@@ -96,6 +96,9 @@ The repository contains an npm-generated `package-lock.json` (lockfile v3). Use 
 
 ## Mobile browser smoke test
 
+For v0.12.19 test PRESTIGE as the fourth main tab (UPGRADES, STATS, PRESTIGE, OPTIONS). By default capacity begins at 100 Fingers, 60 Big Toes, 40 Ghost Hands and 40 Stickmen, and existing saves with more helpers retain enough grandfathered capacity to cover their ownership. Permanent capacity costs 1, 4, 9... Sparks for successive levels, increasing the individual cap by 25/10/5/5 slots. Unlock Krypton and produce at least 100K weighted plasma **in a run** to earn Sparks on reset. Two explicit Prestige confirmations are required. Your current run's helpers, unlocked gases, balances and power upgrades reset; lifetime stats and permanent capacity survive. OPTIONS groups toggles/links/data controls and now requires RESET SAVE → CONFIRM 1 OF 2 → DELETE SAVE · FINAL. The final step permanently removes Prestige as well as everything else.
+
+
 Version 0.12.18: verify the upgrade sub-tabs read HELP, POWER, GAS in that order. On Android with dozens of Fingers/Toes/Stickmen, helpers should move all around the ball rather than accumulating in horizontal strips at the top or sides. The ball, glass rim and larger stand should remain inside the square canvas. All owned helpers remain visually represented. Prestige remains a design discussion and its fourth main tab has **not** been enabled.
 
 

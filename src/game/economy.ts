@@ -18,6 +18,7 @@ import {
   zero3,
 } from "./config.ts";
 import type { Gas, GasId, GasRecord, GameState } from "./types.ts";
+import { helperRoom } from "./prestige.ts";
 
 export const fingerCost = (n: number, unlocked: GasId[]): Partial<GasRecord> => {
   const c: Partial<GasRecord> = { neon: Math.ceil(5 * Math.pow(1.18, n)) };
@@ -98,10 +99,10 @@ export const bulkCost = (
   let n = 0;
   while (n < count) {
     let c: Partial<GasRecord> | null = null;
-    if (kind === "finger") c = fingerCost(s.fingers + n, s.unlocked);
-    if (kind === "toe") c = toeCost(s.toes + n, s.unlocked);
-    if (kind === "ghost") c = ghostCost(s.ghosts + n);
-    if (kind === "stickman") c = stickmanCost(s.stickmen + n);
+    if (kind === "finger" && n < helperRoom(s, "finger")) c = fingerCost(s.fingers + n, s.unlocked);
+    if (kind === "toe" && n < helperRoom(s, "toe")) c = toeCost(s.toes + n, s.unlocked);
+    if (kind === "ghost" && n < helperRoom(s, "ghost")) c = ghostCost(s.ghosts + n);
+    if (kind === "stickman" && n < helperRoom(s, "stickman")) c = stickmanCost(s.stickmen + n);
     if (kind === "filament" && gid)
       c = s.filaments[gid] + n >= gasById(gid).cap ? null : filamentCost(gid, s.filaments[gid] + n);
     if (kind === "voltage" && gid)
@@ -121,10 +122,10 @@ export const bulkCost = (
 
 // price of the next single unit — shown when you can't afford any
 export function peekCost(s: GameState, kind: BuyKind, gid?: GasId): Partial<GasRecord> {
-  if (kind === "finger") return fingerCost(s.fingers, s.unlocked);
-  if (kind === "toe") return toeCost(s.toes, s.unlocked);
-  if (kind === "ghost") return ghostCost(s.ghosts);
-  if (kind === "stickman") return stickmanCost(s.stickmen);
+  if (kind === "finger") return helperRoom(s, "finger") ? fingerCost(s.fingers, s.unlocked) : {};
+  if (kind === "toe") return helperRoom(s, "toe") ? toeCost(s.toes, s.unlocked) : {};
+  if (kind === "ghost") return helperRoom(s, "ghost") ? ghostCost(s.ghosts) : {};
+  if (kind === "stickman") return helperRoom(s, "stickman") ? stickmanCost(s.stickmen) : {};
   if (kind === "filament" && gid)
     return s.filaments[gid] >= gasById(gid).cap ? {} : filamentCost(gid, s.filaments[gid]);
   if (kind === "voltage" && gid)
