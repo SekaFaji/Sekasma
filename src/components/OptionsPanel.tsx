@@ -7,11 +7,11 @@ const LINKS = [
 ] as const;
 
 export default function OptionsPanel({
-  scanlines, buzz, resetStep, onToggleScanlines, onToggleBuzz,
+  scanlines, buzz, fullscreen, fullscreenAvailable, resetStep, onToggleScanlines, onToggleBuzz, onToggleFullscreen,
   onStartReset, onNextReset, onConfirmReset, onCancelReset,
 }: {
-  scanlines: boolean; buzz: boolean; resetStep: ResetStep;
-  onToggleScanlines: () => void; onToggleBuzz: () => void;
+  scanlines: boolean; buzz: boolean; fullscreen: boolean; fullscreenAvailable: boolean; resetStep: ResetStep;
+  onToggleScanlines: () => void; onToggleBuzz: () => void; onToggleFullscreen: () => void;
   onStartReset: () => void; onNextReset: () => void;
   onConfirmReset: () => void; onCancelReset: () => void;
 }) {
@@ -31,6 +31,15 @@ export default function OptionsPanel({
               style={{ color: setting.enabled ? "#61e06b" : "#ffffff90" }}>{setting.enabled ? "ON" : "OFF"}</span>
           </button>
         ))}
+        {fullscreenAvailable && (
+          <button type="button" aria-pressed={fullscreen} onClick={onToggleFullscreen}
+            className="flex min-h-[48px] w-full items-center justify-between gap-2 border border-white/20 bg-[#1b1233] px-2 py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
+            <span><span className="block font-bold">FULLSCREEN</span>
+              <span className="block text-[9px] text-white/55">HIDE BROWSER CHROME WHERE SUPPORTED</span></span>
+            <span className="min-w-[40px] border border-white/20 px-1.5 py-1 text-center font-bold"
+              style={{ color: fullscreen ? "#61e06b" : "#ffffff90" }}>{fullscreen ? "ON" : "OFF"}</span>
+          </button>
+        )}
       </section>
       <section aria-labelledby="community-settings-heading" className="border border-white/15 bg-[#120c26] p-2">
         <h2 id="community-settings-heading" className="mb-2 font-bold tracking-widest text-[#d4b6ff]">SEKAFAJI COMMUNITY</h2>
