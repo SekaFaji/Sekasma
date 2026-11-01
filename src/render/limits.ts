@@ -28,9 +28,11 @@ export function visibleHelperCounts(owned: HelperCounts): HelperCounts {
 export function helperOrbitRadius(kind: HelperKind, index: number, ballRadius: number): number {
   const ring = Math.max(0, Math.floor(index)) % 3;
   if (kind === "ghosts") return ballRadius - 8 - ring * 11;
-  if (kind === "toes") return ballRadius - 7 - ring * 4;
+  // Larger detailed 45-degree poses must remain entirely in the 150px field.
+  // Pull fingers and toes inward, never clamp them to the canvas edges.
+  if (kind === "toes") return ballRadius - 16 - ring * 4;
   if (kind === "stickmen") return ballRadius - 3 - ring * 3;
-  return ballRadius - 10 - ring * 4;
+  return ballRadius - 14 - ring * 4;
 }
 
 /** Probability per autonomous strike for its costly effects; sprites are NEVER sampled. */

@@ -441,3 +441,62 @@ test("fullscreen control is available only when the browser supports it and refl
   }));
   assert.doesNotMatch(unsupported, /FULLSCREEN/);
 });
+
+test("anatomical helpers have detailed rectangular 8-way sprite art and distinct press poses", async () => {
+  const art = await server.ssrLoadModule("/src/render/sprites.ts");
+  const palettes = await server.ssrLoadModule("/src/render/palette.ts");
+  const kinds = [
+    [art.FINGER_SPRITE, art.FINGER_PRESS_SPRITE, art.FINGER_ORIENTS, art.FINGER_PRESS_ORIENTS, 10, 18, palettes.SKIN_PALETTE],
+    [art.FOOT_SPRITE, art.FOOT_PRESS_SPRITE, art.FOOT_ORIENTS, art.FOOT_PRESS_ORIENTS, 12, 15, palettes.TOE_PALETTE],
+  ];
+  for (const [idle, pressed, idleAngles, pressAngles, width, height, palette] of kinds) {
+    assert.equal(idle.length, height);
+    assert.equal(pressed.length, height);
+    assert.equal(idleAngles.length, 8);
+    assert.equal(pressAngles.length, 8);
+    assert.ok(Object.keys(palette).length >= 9);
+    for (const frame of [idle, pressed]) {
+      for (const row of frame) {
+        assert.equal(row.length, width, "ragged row would corrupt cached canvas");
+        for (const pixel of row) assert.ok(pixel === "." || palette[pixel], "unknown palette shade");
+      }
+      assert.ok(frame.flatMap(row => [...row]).filter(v => v === "4" || v === "5").length >= 6,
+        "both sprites need a visible nail");
+    }
+    assert.notDeepEqual(idle, pressed);
+    for (const angle of [...idleAngles, ...pressAngles]) {
+      assert.ok(angle.length <= 21 && angle[0].length <= 21, "rotated art must fit the ball");
+      assert.ok(angle.every(row => row.length === angle[0].length), "rotated frame must be rectangular");
+    }
+  }
+  assert.deepEqual(art.PLAYER_FINGER, art.FINGER_PRESS_SPRITE);
+});
+
+test("enlarged helper sprites remain inside the full canvas at all angles", async () => {
+  const art = await server.ssrLoadModule("/src/render/sprites.ts");
+  const { helperOrbitRadius } = await server.ssrLoadModule("/src/render/limits.ts");
+  const { CX, CY, R, PX } = await server.ssrLoadModule("/src/render/geometry.ts");
+  for (const [kind, poses] of [
+    ["fingers", [art.FINGER_ORIENTS, art.FINGER_PRESS_ORIENTS]],
+    ["toes", [art.FOOT_ORIENTS, art.FOOT_PRESS_ORIENTS]],
+  ]) {
+    for (let ring = 0; ring < 3; ring++) {
+      const orbit = helperOrbitRadius(kind, ring, R);
+      for (let degree = 0; degree < 360; degree++) {
+        const angle = degree * Math.PI / 180;
+        const inward = angle + Math.PI;
+        const idx = ((Math.round((inward + Math.PI / 2) / (Math.PI / 4)) % 8) + 8) % 8;
+        for (const frames of poses) {
+          const sprite = frames[idx];
+          const w = sprite[0].length;
+          const h = sprite.length;
+          const radius = orbit + (kind === "toes" ? 1 : 0) + Math.max(w, h) / 2;
+          const x = Math.round(CX + Math.cos(angle) * radius - w / 2);
+          const y = Math.round(CY + Math.sin(angle) * radius - h / 2);
+          assert.ok(x >= 0 && y >= 0 && x + w <= PX && y + h <= PX,
+            `${kind} ring ${ring}, ${degree} degrees clipped`);
+        }
+      }
+    }
+  }
+});

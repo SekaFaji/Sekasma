@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.21 - Anatomical helper pixel-art overhaul
+
+- Redraw hired Fingers (10x18) and Big Toes (12x15) with anatomically shaped silhouettes, nails, skin creases and richer shading
+- Add hand-pixeled contact frames: quick bending fingertip and heavier toe compression, with small plasma-lit accents
+- Make the player's manual-touch Finger use the same detailed art family
+- Keep eight-direction cached pixel orientation; do not load any external or generated assets
+- Adjust Finger/Toe orbit radii to keep every enlarged frame on-screen without edge clamping
+- Keep every owned helper visible and preserve helper counts, earning rates, save data and Prestige caps
+- Add sprite palette, shape, press-frame, orientation and all-angle clipping regression tests
+
 ## 0.12.20 - Organic plasma and compact game UX
 
 - Reduce new-run helper limits to 30 Fingers, 25 Big Toes, 20 Ghost Hands and 15 Stickmen
