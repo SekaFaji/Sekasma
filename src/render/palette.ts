@@ -34,4 +34,17 @@ export const TOE_PALETTE: Record<string, string> = {
 
 // helpers behind the glass: pressed from the far side, silhouetted
 export const BACK_PALETTE: Record<string, string> = { "0": "#150a1e", "1": "#a5704b", "2": "#b9937f", "3": "#8a5a3b" };
-export const GHOST_PALETTE: Record<string, string> = { "1": "#a9b8ff", "2": "#eef4ff" };
+/** Frost-blue spectral hand: violet silhouette, translucent icy shading,
+ * glowing finger pads, fine creases and pale plasma-lit veins.
+ * Opacity is animated by drawGhost; these colors are fixed for atlas caching.
+ */
+export const GHOST_PALETTE: Record<string, string> = {
+  "0": "#3a3975",
+  "1": "#7899d2",
+  "2": "#b6d9fa",
+  "3": "#536ba9",
+  "4": "#effbff",
+  "5": "#7c9fd2",
+  "6": "#d8f3ff",
+  "7": "#d4affb",
+};

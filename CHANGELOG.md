@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.22 - Spectral Ghost Hand pixel art
+
+- Replace simple Ghost Hand silhouette with a detailed 17x21 hand-pixeled spectral sprite: four fingers, side thumb, shaded palm, creases and tapered wrist
+- Add an alternate glowing contact pose, eight cached directional orientations and an icy blue-white-violet palette
+- Improve the existing manifest, press and dissolve cycle with brighter contact, smooth retreat, four lightweight particle fragments and a faint resting silhouette for every owned ghost
+- Move ghost orbit rings inward so the larger hand remains inside the round plasma globe without screen-edge clamping
+- Preserve Ghost Hand purchases, passive earnings, unlocks, save data and Prestige capacity
+- Add sprite-detail, palette-coverage and 360-degree geometry tests for all ghost poses and rings
+- Leave Stickmen for a separate art patch
+
 ## 0.12.21 - Anatomical helper pixel-art overhaul
 
 - Redraw hired Fingers (10x18) and Big Toes (12x15) with anatomically shaped silhouettes, nails, skin creases and richer shading

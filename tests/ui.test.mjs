@@ -500,3 +500,56 @@ test("enlarged helper sprites remain inside the full canvas at all angles", asyn
     }
   }
 });
+
+test("spectral Ghost Hand has detailed palette-backed idle/press poses in all eight directions", async () => {
+  const art = await server.ssrLoadModule("/src/render/sprites.ts");
+  const { GHOST_PALETTE } = await server.ssrLoadModule("/src/render/palette.ts");
+  assert.deepEqual([art.GHOST_SPRITE[0].length, art.GHOST_SPRITE.length], [17, 21]);
+  assert.notDeepEqual(art.GHOST_SPRITE, art.GHOST_PRESS_SPRITE);
+  assert.equal(art.GHOST_ORIENTS.length, 8);
+  assert.equal(art.GHOST_PRESS_ORIENTS.length, 8);
+  assert.ok(Object.keys(GHOST_PALETTE).length >= 8);
+  for (const sprite of [art.GHOST_SPRITE, art.GHOST_PRESS_SPRITE]) {
+    assert.equal(sprite.length, 21);
+    assert.ok(sprite.every(row => row.length === 17), "ghost has a ragged sprite row");
+    assert.ok(sprite.some(row => row.includes(".")), "separated fingers need transparent gaps");
+    assert.ok(sprite.some(row => row.includes("4")), "ghost needs illuminated fingertips");
+    assert.ok(sprite.some(row => row.includes("6")), "ghost needs plasma-lit palm detail");
+    for (const pixel of sprite.join("")) {
+      assert.ok(pixel === "." || GHOST_PALETTE[pixel], `unknown spectral pixel shade ${pixel}`);
+    }
+  }
+  for (const pose of [...art.GHOST_ORIENTS, ...art.GHOST_PRESS_ORIENTS]) {
+    assert.ok(pose.length <= 28 && pose[0].length <= 28);
+    assert.ok(pose.every(row => row.length === pose[0].length));
+  }
+});
+
+test("every ghost pose and orbit ring stays within the round glass, without edge clamping", async () => {
+  const art = await server.ssrLoadModule("/src/render/sprites.ts");
+  const { helperOrbitRadius } = await server.ssrLoadModule("/src/render/limits.ts");
+  const { CX, CY, R, PX } = await server.ssrLoadModule("/src/render/geometry.ts");
+  for (const frames of [art.GHOST_ORIENTS, art.GHOST_PRESS_ORIENTS]) {
+    for (let ring = 0; ring < 3; ring++) {
+      const reach = helperOrbitRadius("ghosts", ring, R);
+      for (let degree = 0; degree < 360; degree++) {
+        const angle = degree * Math.PI / 180;
+        const idx = ((Math.round((angle + Math.PI / 2) / (Math.PI / 4)) % 8) + 8) % 8;
+        const sprite = frames[idx];
+        const w = sprite[0].length;
+        const h = sprite.length;
+        const safe = R - Math.ceil(Math.max(w, h) / 2) - 1;
+        const radius = Math.min(reach, safe);
+        const x = Math.round(CX + Math.cos(angle) * radius - w / 2);
+        const y = Math.round(CY + Math.sin(angle) * radius - h / 2);
+        for (let row = 0; row < h; row++) for (let col = 0; col < w; col++) {
+          if (sprite[row][col] === ".") continue;
+          const px = x + col;
+          const py = y + row;
+          assert.ok(px >= 0 && py >= 0 && px < PX && py < PX, "ghost clipped at canvas edge");
+          assert.ok(Math.hypot(px - CX, py - CY) <= R, `ghost escaped globe at ${degree} degrees`);
+        }
+      }
+    }
+  }
+});
