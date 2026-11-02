@@ -419,23 +419,27 @@ export default function PlasmaBall({
         const ang = gi * 2.399963 + Math.sin(t * 0.11 + gi * 1.7) * 0.15;
         let reach: number;
         let alpha: number;
+        const ringReach = helperOrbitRadius("ghosts", gi, R);
         if (st === 0) {
           const e = p * p * (3 - 2 * p);
-          reach = 10 + (R - 17) * e;
-          alpha = 0.15 + 0.6 * e;
+          reach = 10 + (ringReach - 10) * e;
+          alpha = 0.17 + 0.61 * e;
         } else if (st === 1) {
-          reach = R - 7 + Math.sin(t * 13 + gi) * 0.7;
-          alpha = 0.62 + Math.sin(t * 9 + gi) * 0.1;
+          reach = ringReach + Math.sin(t * 11 + gi) * 0.45;
+          alpha = 0.76 + Math.sin(t * 8 + gi) * 0.08;
           ghostHold = { ang };
         } else if (st === 2) {
-          reach = R - 7 + p * 14;
-          alpha = Math.max(0.24, 0.75 * (1 - p));
+          // The hand retreats into the glass while its bright fragments shed.
+          reach = ringReach - p * 5;
+          alpha = Math.max(0.17, 0.76 * (1 - p));
         } else {
-          reach = helperOrbitRadius("ghosts", gi, R);
-          alpha = 0.26;
+          reach = ringReach - 4;
+          alpha = 0.28;
         }
-        // Multiple ghost rings make large armies identifiable inside the ball.
-        drawGhost(ctx, ang, Math.min(reach, helperOrbitRadius("ghosts", gi, R)), alpha, t + gi);
+        // All owned Ghost Hands remain represented, including their resting
+        // silhouettes. Animations are visual-only and keep existing income.
+        drawGhost(ctx, ang, reach, alpha, t + gi,
+          st === 0 ? "manifest" : st === 1 ? "press" : st === 2 ? "dissolve" : "rest", p);
         if (st === 1 && Math.random() < effectChance) {
           // your strings bend toward its palm
           drawPlasmaArc(
