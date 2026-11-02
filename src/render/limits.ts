@@ -27,7 +27,7 @@ export function visibleHelperCounts(owned: HelperCounts): HelperCounts {
  */
 export function helperOrbitRadius(kind: HelperKind, index: number, ballRadius: number): number {
   const ring = Math.max(0, Math.floor(index)) % 3;
-  if (kind === "ghosts") return ballRadius - 8 - ring * 11;
+  if (kind === "ghosts") return ballRadius - 15 - ring * 10; // keep the enlarged spectral palm within the glass
   // Larger detailed 45-degree poses must remain entirely in the 150px field.
   // Pull fingers and toes inward, never clamp them to the canvas edges.
   if (kind === "toes") return ballRadius - 16 - ring * 4;
