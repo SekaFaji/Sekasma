@@ -101,18 +101,57 @@ export const FOOT_PRESS_SPRITE = [
 // The same anatomical design for the player's manual touch.
 export const PLAYER_FINGER = FINGER_PRESS_SPRITE;
 
-// the ghost hand: reaches from the electrode, fingers toward the glass
+// Spectral hand seen through the plasma glass: four separated fingers,
+// a side thumb, palm creases, wrist taper and a bright ionized silhouette.
+// All seven color shades are hand-authored logical pixels (17x21).
 export const GHOST_SPRITE = [
-  "2.2.2.2",
-  "2.2.2.2",
-  "1212121",
-  "1111111",
-  ".11111.",
-  ".11111.",
-  ".11111.",
-  "..111..",
-  "..111..",
-  "...1...",
+  "......00.........",
+  ".....044000......",
+  "...000440440.....",
+  "..0440440440.....",
+  "..044044044000...",
+  "..0220220210330..",
+  "..0220220110330..",
+  "..0220220110330..",
+  "..0220220110320..",
+  "..0220220110230..",
+  "..0220220110330..",
+  ".02222221123330..",
+  "022222266613330..",
+  "022722266613330..",
+  "022222566613330..",
+  ".00222521513320..",
+  "...02222111320...",
+  "...02222111230...",
+  "....022211230....",
+  "....022232330....",
+  "....022223330....",
+];
+
+// When the hand presses the glass, fingertips bunch up and brighten.
+// Separate pre-baked pose avoids runtime resampling of pixel-art pixels.
+export const GHOST_PRESS_SPRITE = [
+  ".................",
+  ".................",
+  "......000000.....",
+  ".....04444440....",
+  "...0004444440....",
+  "..0222221213000..",
+  "..02222221133330.",
+  "..02222211133320.",
+  "..02222211133230.",
+  "..02222211132330.",
+  "..02222211123330.",
+  ".022222211233330.",
+  "0222222666133330.",
+  "0227222666133330.",
+  "022222566613330..",
+  "022222521513320..",
+  ".0002222111320...",
+  "...02222111230...",
+  "....022211230....",
+  "....022232330....",
+  "....022223330....",
 ];
 export const STICKMAN_SPRITE = [
   "..0....", ".010...", "..0.2..", ".1012..", "..0....", ".1.1...", "1...1..",
@@ -168,6 +207,7 @@ export const FINGER_PRESS_ORIENTS = sprOrients8(FINGER_PRESS_SPRITE);
 export const FOOT_ORIENTS = sprOrients8(FOOT_SPRITE);
 export const FOOT_PRESS_ORIENTS = sprOrients8(FOOT_PRESS_SPRITE);
 export const GHOST_ORIENTS = sprOrients8(GHOST_SPRITE);
+export const GHOST_PRESS_ORIENTS = sprOrients8(GHOST_PRESS_SPRITE);
 
 /** Rasterize repeated pixel sprites only once, then blit cached bitmaps.
  * One drawImage per helper instead of dozens of per-pixel fillRect calls.
@@ -224,27 +264,56 @@ export function drawOriented(
   );
 }
 
-// ghost hands: grow from the electrode, fingers point OUT to the glass
+// Animated spectral hand. The full eight-direction frames are cached once;
+// dissolve particles are four lightweight pixels, not new canvas objects.
+export type GhostPhase = "rest" | "manifest" | "press" | "dissolve";
 export function drawGhost(
   ctx: CanvasRenderingContext2D,
   angle: number,
   reach: number,
   alpha: number,
   t: number,
+  phase: GhostPhase = "rest",
+  dissolve = 0,
 ) {
   const idx = ((Math.round((angle + Math.PI / 2) / (Math.PI / 4)) % 8) + 8) % 8;
-  const spr = GHOST_ORIENTS[idx];
+  const spr = (phase === "press" ? GHOST_PRESS_ORIENTS : GHOST_ORIENTS)[idx];
   const w = spr[0].length;
   const h = spr.length;
-  const jitter = Math.sin(t * 21) * 0.6;
-  ctx.globalAlpha = alpha;
-  drawSprite(
-    ctx, spr,
-    Math.max(0, Math.min(PX - w, Math.round(CX + Math.cos(angle) * (reach + jitter) - w / 2))),
-    Math.max(0, Math.min(PX - h, Math.round(CY + Math.sin(angle) * (reach + jitter) - h / 2))),
-    GHOST_PALETTE,
-  );
-  ctx.globalAlpha = 1;
+  // Center at most one half-sprite from the interior glass edge. No clamp
+  // against the canvas border, which formerly piled helpers into lines.
+  const safeRadius = R - Math.ceil(Math.max(w, h) / 2) - 1;
+  const rad = Math.min(Math.max(0, reach), safeRadius);
+  const jitter = Math.sin(t * 7 + angle * 3) * (phase === "press" ? 0.3 : 0.15);
+  const centerX = Math.round(CX + Math.cos(angle) * (rad + jitter));
+  const centerY = Math.round(CY + Math.sin(angle) * (rad + jitter));
+  const x = Math.round(centerX - w / 2);
+  const y = Math.round(centerY - h / 2);
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  drawSprite(ctx, spr, x, y, GHOST_PALETTE);
+  if (phase === "press") {
+    // One glass-contact sparkle on the radial fingertip, with a gentle pulse.
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha * (0.55 + 0.3 * Math.sin(t * 11))));
+    ctx.fillStyle = "#ecfcff";
+    const tip = rad + Math.max(w, h) / 2;
+    ctx.fillRect(Math.round(CX + Math.cos(angle) * tip),
+      Math.round(CY + Math.sin(angle) * tip), 1, 1);
+  }
+  if (phase === "dissolve") {
+    // Stable per-hand particle pattern. Fragment drift increases as the
+    // hand fades, while the sprite itself remains visible until retreat.
+    ctx.fillStyle = "#b8e9ff";
+    ctx.globalAlpha = Math.max(0, alpha * (1 - dissolve * 0.5));
+    for (let i = 0; i < 4; i++) {
+      const theta = angle + i * 2.399963 + t * 0.2;
+      const dist = 2 + dissolve * (3 + i * 1.4);
+      const px = Math.round(centerX + Math.cos(theta) * dist);
+      const py = Math.round(centerY + Math.sin(theta) * dist);
+      if (Math.hypot(px - CX, py - CY) < R - 1) ctx.fillRect(px, py, 1, 1);
+    }
+  }
+  ctx.restore();
 }
 // ---------- UI pixel icons (no emoji) ----------
 export const VOLT_ICON = [
