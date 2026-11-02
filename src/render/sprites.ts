@@ -3,7 +3,7 @@
  * baking (quarter turns plus a nearest-neighbour 45-degree fold), the
  * low-level canvas blitters and the tiny pixel font.
  */
-import { PX, CX, CY, R } from "./geometry";
+import { CX, CY, R } from "./geometry";
 import { GHOST_PALETTE } from "./palette";
 
 /**
