@@ -15,14 +15,14 @@ export type PurchaseImpact = {
   gained: string;
 };
 
-function fmtImpact(n: number): string {
+function fmtImpact(n: number, delta = 0): string {
   if (n === 0) return "0";
-  if (n < 0.001) return n.toPrecision(2);
-  if (n < 1) {
-    const digits = n < 0.01 ? 4 : n < 0.1 ? 3 : 2;
-    return n.toFixed(digits).replace(/0+$/, "").replace(/\.$/, "");
-  }
-  return fmt(n);
+  if (n >= 1000) return fmt(n);
+  // Preserve enough digits to show tiny Volt changes such as 0.1 -> 0.10001.
+  const needed = delta > 0 ? Math.min(8, Math.max(0, Math.ceil(-Math.log10(delta)) + 1)) : 0;
+  const baseline = n < 0.01 ? 4 : n < 0.1 ? 3 : n < 1 ? 2 : 0;
+  const decimals = Math.max(needed, baseline);
+  return n.toFixed(decimals).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 /** Model the rate from exactly count extra units without mutating state. */
@@ -49,8 +49,9 @@ export function previewPurchaseImpact(
     after = cracklePower(gas, updated);
   }
   if (![before, after].every(Number.isFinite) || after < before) return null;
+  const delta = after - before;
   return {
-    preview: `${gas.name}${unit} ${fmtImpact(before)} → ${fmtImpact(after)}`,
-    gained: `+${fmtImpact(after - before)} ${gas.name}${unit}`,
+    preview: `${gas.name}${unit} ${fmtImpact(before, delta)} → ${fmtImpact(after, delta)}`,
+    gained: `+${fmtImpact(delta, delta)} ${gas.name}${unit}`,
   };
 }
