@@ -655,12 +655,12 @@ test("Stats render a small lifetime value below every run value", async () => {
     state: s, unlockedGases: [GAS_LIST[0]], rates: { neon: 0.1, argon: 0, xenon: 0, krypton: 0 },
   }));
   assert.match(markup, /MAIN: THIS RUN/);
-  assert.match(markup, /LIFETIME 13/);
+  assert.match(markup, /aria-label="FINGERS HIRED lifetime 13"/);
   assert.match(markup, /CRACKLES/);
-  assert.match(markup, /LIFETIME 125/);
+  assert.match(markup, /aria-label="CRACKLES lifetime 125"/);
   assert.match(markup, /PLASMA EARNED/);
   assert.match(markup, /BEST EVER/);
-  assert.match(markup, /LIFETIME 3.50\/S/);
+  assert.match(markup, /aria-label="HELP RATE lifetime 3.5\/S"/);
   assert.equal((markup.match(/class="tabular-nums"/g) ?? []).length >= 14, true);
 });
 
@@ -675,8 +675,8 @@ test("Stats retain small lifetime values even when Prestige cleared run helpers 
   const markup = renderToStaticMarkup(React.createElement(StatsPanel, {
     state: s, unlockedGases: [GAS_LIST[0]], rates: { neon: 0, argon: 0, xenon: 0, krypton: 0 },
   }));
-  assert.match(markup, /LIFETIME 26/);
-  assert.match(markup, /LIFETIME 6/);
-  assert.match(markup, /LIFETIME 2.50/);
+  assert.match(markup, /aria-label="FINGERS HIRED lifetime 26"/);
+  assert.match(markup, /aria-label="ARCS lifetime 6"/);
+  assert.match(markup, /aria-label="POWER \/ TAP lifetime 2.5"/);
   assert.match(markup, /Older reset history cannot be reconstructed/);
 });
