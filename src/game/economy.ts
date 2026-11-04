@@ -21,7 +21,8 @@ import type { Gas, GasId, GasRecord, GameState } from "./types.ts";
 import { helperRoom } from "./prestige.ts";
 
 export const fingerCost = (n: number, unlocked: GasId[]): Partial<GasRecord> => {
-  const c: Partial<GasRecord> = { neon: Math.ceil(5 * Math.pow(1.18, n)) };
+  // One-time first hire discount per run: 20 taps instead of 50 at 0.1 Neon/tap.
+  const c: Partial<GasRecord> = { neon: n === 0 ? 2 : Math.ceil(5 * Math.pow(1.18, n)) };
   if (n >= MIX_LV.argon && unlocked.includes("argon"))
     c.argon = Math.ceil(3 * Math.pow(1.15, n));
   if (n >= MIX_LV.xenon && unlocked.includes("xenon"))
