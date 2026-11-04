@@ -48,3 +48,18 @@ export const GHOST_PALETTE: Record<string, string> = {
   "6": "#d8f3ff",
   "7": "#d4affb",
 };
+
+// The Stickman stays a slim black-ink silhouette, with a small warm face,
+// amber scarf and electric-blue fist lighting for readable action at 150px.
+export const STICKMAN_PALETTE: Record<string, string> = {
+  "0": "#171326",
+  "1": "#302941",
+  "2": "#76679a",
+  "3": "#fcf3dc",
+  "4": "#e5b993",
+  "5": "#ffb849",
+  "6": "#524b72",
+  "7": "#ffe0bc",
+  "8": "#70d8ff",
+  "9": "#f5faff",
+};
