@@ -48,7 +48,7 @@ export default function StatsPanel({ state, unlockedGases, rates }: {
           <StatCard title="FINGERS HIRED" value={String(state.fingers)} lifetime={String(ls.helperHires.finger)} />
           <StatCard title="BIG TOES" value={String(state.toes)} lifetime={String(ls.helperHires.toe)} />
           <StatCard title="GHOST HANDS" value={String(state.ghosts)} lifetime={String(ls.helperHires.ghost)} />
-          <StatCard title="STICKMEN" value={String(state.stickmen)} lifetime={String(ls.helperHires.stickman)} />
+          <StatCard title="STICKMEN" value={String(state.stickmen)} lifetime={String(ls.helperHires.stickman)} note="KRYPTON HELPER" />
         </div>
       </section>
       {unlockedGases.map(gas => {
