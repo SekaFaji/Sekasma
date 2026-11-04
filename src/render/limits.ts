@@ -31,7 +31,7 @@ export function helperOrbitRadius(kind: HelperKind, index: number, ballRadius: n
   // Larger detailed 45-degree poses must remain entirely in the 150px field.
   // Pull fingers and toes inward, never clamp them to the canvas edges.
   if (kind === "toes") return ballRadius - 16 - ring * 4;
-  if (kind === "stickmen") return ballRadius - 3 - ring * 3;
+  if (kind === "stickmen") return ballRadius - 9 - ring * 4; // 18px run/jump poses need extra top-edge headroom
   return ballRadius - 14 - ring * 4;
 }
 

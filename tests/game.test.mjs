@@ -426,3 +426,23 @@ test("plasma noise is deterministic, organically varied and pinned to endpoints"
   const nearbyFrame = plasmaDisplacement(0.4, 2.01, 3, 4, 1);
   assert.ok(Math.abs(nearbyFrame - plasmaDisplacement(0.4, 2, 3, 4, 1)) < 1);
 });
+
+test("Stickman animation visits every pose and emits one punch signal per leap", () => {
+  const agent = createStickman(2, 0);
+  const seen = new Set();
+  let strikes = 0;
+  let lastStrike = -1;
+  for (let step = 0; step <= 500; step++) {
+    const t = step * 0.02;
+    const pose = advanceStickman(agent, t, 0.02);
+    seen.add(pose.frame);
+    if (pose.strike) {
+      strikes++;
+      assert.equal(pose.frame, "punch", "strike must be accompanied by punch art");
+      assert.ok(t - lastStrike > 0.72, "at most one strike per jump");
+      lastStrike = t;
+    }
+  }
+  assert.deepEqual([...seen].sort(), ["fall", "land", "leap", "punch", "runA", "runB", "windup"].sort());
+  assert.ok(strikes >= 2);
+});

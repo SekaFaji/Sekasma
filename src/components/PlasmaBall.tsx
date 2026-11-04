@@ -23,6 +23,7 @@ import {
 import { drawPlasmaArc, pixelCircle } from "../render/plasma";
 import { visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../render/limits";
 import { advanceStickman, createStickman, type StickmanMotion } from "../render/stickmen";
+import { drawStickman } from "../render/stickmanArt";
 import type { Ripple, FloatText, Flash, HoldArc, Wanderer } from "../render/plasma";
 import type { Gas, GasRecord } from "../game/types";
 
@@ -227,29 +228,6 @@ export default function PlasmaBall({
       return u[u.length - 1];
     };
 
-    const drawStickman = (x: number, y: number, attack: boolean, stride: boolean, facing: number) => {
-      ctx.save();
-      ctx.translate(Math.round(x), Math.round(y));
-      ctx.scale(facing, 1);
-      // Walking legs, alternating foot positions, separate from the attack pose.
-      ctx.fillStyle = "#20152e";
-      ctx.fillRect(-2, -9, 4, 4);
-      ctx.fillRect(-1, -5, 2, 4);
-      ctx.fillRect(stride ? -3 : -2, -1, 2, 2);
-      ctx.fillRect(stride ? 1 : 0, -1, 2, 2);
-      ctx.fillStyle = "#fff2c7";
-      ctx.fillRect(0, -8, 1, 1);
-      ctx.fillStyle = "#ffb347";
-      ctx.fillRect(-2, -5, 3, 1);
-      ctx.fillStyle = "#20152e";
-      ctx.fillRect(-4, attack ? -8 : -4, 3, 1);
-      ctx.fillRect(1, attack ? -8 : -4, 4, 1);
-      if (attack) {
-        ctx.fillStyle = "#fff1c7";
-        ctx.fillRect(5, -8, 2, 2);
-      }
-      ctx.restore();
-    };
     const drawGlassCrack = (crack: { x: number; y: number; age: number; ttl: number; seed: number }) => {
       ctx.globalAlpha = Math.max(0, 1 - crack.age / crack.ttl) * 0.9;
       ctx.fillStyle = "#fff1c7";
@@ -602,7 +580,7 @@ export default function PlasmaBall({
           flashes.current.push({ x: impactX, y: impactY, age: 0, forks: 2, amp: 4.5, gas: pickGas() });
           ripples.current.push({ x: impactX, y: impactY, age: 0, color: "#ffd166" });
         }
-        drawStickman(x, y, pose.attack, pose.stride, Math.cos(pose.angle) > 0 ? -1 : 1);
+        drawStickman(ctx, x, y, pose, Math.cos(pose.angle) > 0 ? -1 : 1);
       }
       if (glassCracks.current.length > 16)
         glassCracks.current.splice(0, glassCracks.current.length - 16);
