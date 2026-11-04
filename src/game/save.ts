@@ -4,11 +4,12 @@
  */
 import { GAS_LIST } from "./gases.ts";
 import { MAX_VOLT_STEPS, SPLIT_CAP, VOLT_STEP, zero3 } from "./config.ts";
-import type { GasId, GameState, HelperId, HelperRecord, PrestigeProgress } from "./types.ts";
+import type { GasId, GameState, HelperId, HelperRecord, LifetimeStats, PrestigeProgress } from "./types.ts";
+import { cracklePower, idleRate } from "./economy.ts";
 import { BASE_CAPACITY, HELPERS, freshPrestige } from "./prestige.ts";
 
 export const SAVE_KEY = "idle-plasma-ball-save-v10";
-// Keep existing save keys stable for old installs. The internal schema is v15.
+// Keep existing save keys stable for old installs. The internal schema is v16.
 export const BACKUP_KEY = "idle-plasma-ball-save-backup-v12";
 export const LEGACY_V9_KEY = "idle-plasma-ball-save-v9";
 export const LEGACY_V8_KEY = "idle-plasma-ball-save-v8";
@@ -28,6 +29,18 @@ export function loadOpts(): { scan: boolean; buzz: boolean } {
   return { scan: true, buzz: true };
 }
 
+export function freshLifetime(): LifetimeStats {
+  return {
+    helperHires: { finger: 0, toe: 0, ghost: 0, stickman: 0 },
+    purchasedArcs: zero3(),
+    purchasedSplits: zero3(),
+    purchasedVoltage: zero3(),
+    peakHelpRate: zero3(),
+    peakTapPower: { ...zero3(), neon: GAS_LIST[0].baseRate },
+    runStartCrackles: 0, runStartActiveSeconds: 0, runStartOfflineSeconds: 0,
+  };
+}
+
 export function freshSave(): GameState {
   const now = Date.now();
   return {
@@ -36,6 +49,7 @@ export function freshSave(): GameState {
     filaments: zero3(), splits: zero3(), unlocked: ["neon"],
     created: now, lastSeen: now, activeSeconds: 0, offlineSeconds: 0,
     prestige: freshPrestige(),
+    lifetime: freshLifetime(),
   };
 }
 
@@ -87,6 +101,32 @@ function sanitizeSave(s: GameState): GameState {
     legacyCapacity[kind] = Math.max(BASE_CAPACITY[kind], preserved, Math.floor(validNumber(owned)));
   }
   const lastTotal = record(rawPrestige.lastTotal);
+  const prior = s.lifetime && typeof s.lifetime === "object"
+    ? s.lifetime as Partial<LifetimeStats> : {};
+  const baseline = freshLifetime();
+  const helperHires = capacityRecord(prior.helperHires, {
+    finger: Math.floor(validNumber(s.fingers)),
+    toe: Math.floor(validNumber(s.toes)),
+    ghost: Math.floor(validNumber(s.ghosts)),
+    stickman: Math.floor(validNumber(s.stickmen)),
+  });
+  const purchasedArcs = record(prior.purchasedArcs ?? filaments);
+  const purchasedSplits = record(prior.purchasedSplits ?? splits);
+  const purchasedVoltage = record(prior.purchasedVoltage ?? voltage);
+  const peakHelpRate = record(prior.peakHelpRate);
+  const peakTapPower = record(prior.peakTapPower ?? baseline.peakTapPower);
+  // Old saves lack per-run counter snapshots. Do not invent purchases made
+  // in earlier Prestiges; begin counting from migration for prior cycles.
+  const oldRun = validNumber(rawPrestige.cycles) > 0;
+  const legacyOffset = (value: unknown, current: number): number =>
+    Math.min(current, validNumber(value, oldRun ? current : 0));
+  const lifetime: LifetimeStats = {
+    helperHires, purchasedArcs, purchasedSplits, purchasedVoltage,
+    peakHelpRate, peakTapPower,
+    runStartCrackles: legacyOffset(prior.runStartCrackles, Math.floor(validNumber(s.crackles))),
+    runStartActiveSeconds: legacyOffset(prior.runStartActiveSeconds, validNumber(s.activeSeconds)),
+    runStartOfflineSeconds: legacyOffset(prior.runStartOfflineSeconds, validNumber(s.offlineSeconds)),
+  };
   const prestige: PrestigeProgress = {
     cycles: Math.floor(validNumber(rawPrestige.cycles)),
     sparks: Math.floor(validNumber(rawPrestige.sparks)),
@@ -95,7 +135,7 @@ function sanitizeSave(s: GameState): GameState {
     legacyCapacity,
     lastTotal,
   };
-  return {
+  const normalized: GameState = {
     plasma: record(s.plasma), total: record(s.total),
     crackles: Math.floor(validNumber(s.crackles)),
     voltage, filaments, splits, unlocked,
@@ -107,16 +147,38 @@ function sanitizeSave(s: GameState): GameState {
     lastSeen: validNumber(s.lastSeen, fallback.lastSeen),
     activeSeconds: validNumber(s.activeSeconds),
     offlineSeconds: validNumber(s.offlineSeconds),
-    prestige,
+    prestige, lifetime,
   };
+  // Existing purchases/rates cannot be reconstructed after an older reset,
+  // but the surviving current run must never be hidden by the new counters.
+  const nowRates = idleRate(normalized);
+  for (const gas of GAS_LIST) {
+    const id = gas.id;
+    lifetime.purchasedArcs[id] = Math.max(lifetime.purchasedArcs[id], filaments[id]);
+    lifetime.purchasedSplits[id] = Math.max(lifetime.purchasedSplits[id], splits[id]);
+    lifetime.purchasedVoltage[id] = Math.max(lifetime.purchasedVoltage[id], voltage[id]);
+    lifetime.peakHelpRate[id] = Math.max(lifetime.peakHelpRate[id], nowRates[id]);
+    if (unlocked.includes(id))
+      lifetime.peakTapPower[id] = Math.max(lifetime.peakTapPower[id], cracklePower(gas, normalized));
+  }
+  for (const kind of HELPERS) {
+    const held = kind === "finger" ? normalized.fingers : kind === "toe" ? normalized.toes
+      : kind === "ghost" ? normalized.ghosts : normalized.stickmen;
+    lifetime.helperHires[kind] = Math.max(lifetime.helperHires[kind], held);
+  }
+  return normalized;
 }
 
 // migrate older saves into the micro-volt economy
 export function migrateSave(old: Record<string, unknown>): GameState {
   const base = freshSave();
   // v10 / v9 saves: load as-is (v9 predates splits)
-  if (old.v === 15 || old.v === 14 || old.v === 13 || old.v === 12 || old.v === 11 || old.v === 10 || old.v === 9) {
+  if (old.v === 16 || old.v === 15 || old.v === 14 || old.v === 13 || old.v === 12 || old.v === 11 || old.v === 10 || old.v === 9) {
     const s = { ...base, ...(old as unknown as GameState) };
+    // Old snapshots never had lifetime counters. Distinguish "not recorded"
+    // from fresh zeroes so older Prestiges are not counted as this run.
+    if (!Object.prototype.hasOwnProperty.call(old, "lifetime"))
+      s.lifetime = undefined as unknown as LifetimeStats;
     if (!s.splits) s.splits = zero3();
     if (typeof s.ghosts !== "number") s.ghosts = 0;
     if (typeof s.stickmen !== "number") s.stickmen = 0;
@@ -199,7 +261,7 @@ export function persist(s: GameState): boolean {
         // Leave the existing backup untouched.
       }
     }
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 15 }));
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 16 }));
     return true;
   } catch {
     // No storage (e.g. private browsing): retain the in-memory session.

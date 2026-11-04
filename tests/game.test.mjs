@@ -471,3 +471,99 @@ test("Arc Split and tiny Volt improvements remain visible in projected tap rates
   assert.match(previewPurchaseImpact(s, "voltage", "neon", 1).preview, /0.1 → 0.10001/);
   assert.equal(MAX_BULK_PURCHASE, 1000);
 });
+
+test("first Finger arrives after 20 base taps, with all later prices unchanged", () => {
+  assert.equal(fingerCost(0, ["neon"]).neon, 2);
+  assert.equal(fingerCost(1, ["neon"]).neon, 6);
+  assert.equal(fingerCost(2, ["neon"]).neon, 7);
+  const old = freshSave();
+  assert.equal(old.plasma.neon, 0);
+  old.plasma.neon = 2;
+  assert.equal(purchaseUpgrade(old, "finger", undefined, 1).state.fingers, 1);
+  assert.equal(old.fingers, 0);
+});
+
+test("purchases accumulate lifetime helper and power counters and historical peak rates", () => {
+  const start = freshSave();
+  start.plasma = { neon: 1e12, argon: 1e12, xenon: 1e12, krypton: 1e12 };
+  start.unlocked = ["neon", "argon", "xenon", "krypton"];
+  const a = purchaseUpgrade(start, "finger", undefined, 2).state;
+  assert.equal(a.fingers, 2);
+  assert.equal(a.lifetime.helperHires.finger, 2);
+  assert.equal(start.lifetime.helperHires.finger, 0);
+  assert.ok(a.lifetime.peakHelpRate.neon > 0);
+  const b = purchaseUpgrade(a, "toe", undefined, 1).state;
+  const c = purchaseUpgrade(b, "filament", "neon", 2).state;
+  const d = purchaseUpgrade(c, "split", "argon", 1).state;
+  const e = purchaseUpgrade(d, "voltage", "neon", 2).state;
+  assert.equal(e.lifetime.helperHires.toe, 1);
+  assert.equal(e.lifetime.purchasedArcs.neon, 2);
+  assert.equal(e.lifetime.purchasedSplits.argon, 1);
+  assert.equal(e.lifetime.purchasedVoltage.neon, 2);
+  assert.ok(e.lifetime.peakHelpRate.neon > a.lifetime.peakHelpRate.neon);
+  assert.ok(e.lifetime.peakTapPower.neon > start.lifetime.peakTapPower.neon);
+  assert.equal(a.lifetime.purchasedArcs.neon, 0);
+});
+
+test("Prestige keeps lifetime purchases, peaks, production and total time", () => {
+  const s = freshSave();
+  s.unlocked = ["neon", "argon", "xenon", "krypton"];
+  s.plasma = { neon: 1e12, argon: 1e12, xenon: 1e12, krypton: 1e12 };
+  const paid = purchaseUpgrade(s, "finger", undefined, 3).state;
+  paid.total.krypton = 3000;
+  paid.total.neon = 120;
+  paid.crackles = 130;
+  paid.activeSeconds = 210;
+  paid.offlineSeconds = 320;
+  const reset = performPrestige(paid);
+  assert.notStrictEqual(reset, paid);
+  assert.equal(reset.fingers, 0);
+  assert.equal(reset.lifetime.helperHires.finger, 3);
+  assert.equal(reset.lifetime.runStartCrackles, 130);
+  assert.equal(reset.lifetime.runStartActiveSeconds, 210);
+  assert.equal(reset.lifetime.runStartOfflineSeconds, 320);
+  assert.deepEqual(reset.lifetime.peakHelpRate, paid.lifetime.peakHelpRate);
+  assert.equal(reset.total.krypton, 3000);
+  assert.equal(reset.crackles, 130);
+  assert.equal(reset.activeSeconds, 210);
+  const subsequent = { ...reset, plasma: { ...reset.plasma, neon: 2 } };
+  const hired = purchaseUpgrade(subsequent, "finger", undefined, 1).state;
+  assert.equal(hired.lifetime.helperHires.finger, 4);
+  assert.equal(hired.fingers, 1);
+});
+
+test("v15 migration preserves observed counters but cannot invent prior reset totals", () => {
+  const s = freshSave();
+  s.fingers = 6;
+  s.toes = 2;
+  s.filaments.neon = 3;
+  s.splits.neon = 1;
+  s.voltage.neon = 14;
+  s.total.neon = 45678;
+  s.crackles = 678;
+  s.activeSeconds = 234;
+  s.prestige.cycles = 4;
+  const { lifetime, ...old } = s;
+  const restored = migrateSave({ ...old, v: 15 });
+  assert.equal(restored.lifetime.helperHires.finger, 6);
+  assert.equal(restored.lifetime.helperHires.toe, 2);
+  assert.equal(restored.lifetime.purchasedArcs.neon, 3);
+  assert.equal(restored.lifetime.purchasedSplits.neon, 1);
+  assert.equal(restored.lifetime.purchasedVoltage.neon, 14);
+  assert.equal(restored.lifetime.runStartCrackles, 678);
+  assert.equal(restored.lifetime.runStartActiveSeconds, 234);
+  assert.equal(restored.total.neon, 45678);
+  assert.ok(restored.lifetime.peakTapPower.neon > 0.1);
+});
+
+test("v16 lifetime history survives real save and reload without resetting save keys", () => withStorage((items) => {
+  let s = freshSave();
+  s.plasma.neon = 100;
+  s = purchaseUpgrade(s, "finger", undefined, 2).state;
+  assert.equal(persist(s), true);
+  const stored = JSON.parse(items.get(SAVE_KEY));
+  assert.equal(stored.v, 16);
+  assert.equal(loadSave().lifetime.helperHires.finger, 2);
+  assert.equal(loadSave().fingers, 2);
+  assert.equal(loadSave().lifetime.peakHelpRate.neon, s.lifetime.peakHelpRate.neon);
+}));

@@ -21,7 +21,8 @@ import type { Gas, GasId, GasRecord, GameState } from "./types.ts";
 import { helperRoom } from "./prestige.ts";
 
 export const fingerCost = (n: number, unlocked: GasId[]): Partial<GasRecord> => {
-  const c: Partial<GasRecord> = { neon: Math.ceil(5 * Math.pow(1.18, n)) };
+  // One-time first hire discount per run: 20 taps instead of 50 at 0.1 Neon/tap.
+  const c: Partial<GasRecord> = { neon: n === 0 ? 2 : Math.ceil(5 * Math.pow(1.18, n)) };
   if (n >= MIX_LV.argon && unlocked.includes("argon"))
     c.argon = Math.ceil(3 * Math.pow(1.15, n));
   if (n >= MIX_LV.xenon && unlocked.includes("xenon"))
@@ -209,5 +210,30 @@ export function purchaseUpgrade(
     if (!unlocked) return { state: s, count: 0 };
     next.unlocked = [...s.unlocked, unlocked.id];
   }
+  // Permanent purchase counters are independent of run resets. Copy every
+  // nested counter before writing to preserve the original state object.
+  const lifetime = next.lifetime;
+  const updated = { ...lifetime };
+  if (["finger", "toe", "ghost", "stickman"].includes(kind)) {
+    updated.helperHires = {
+      ...lifetime.helperHires, [kind]: lifetime.helperHires[kind as keyof typeof lifetime.helperHires] + count,
+    };
+  } else if (gid && kind === "filament") {
+    updated.purchasedArcs = { ...lifetime.purchasedArcs, [gid]: lifetime.purchasedArcs[gid] + count };
+  } else if (gid && kind === "voltage") {
+    updated.purchasedVoltage = { ...lifetime.purchasedVoltage, [gid]: lifetime.purchasedVoltage[gid] + count };
+  } else if (gid && kind === "split") {
+    updated.purchasedSplits = { ...lifetime.purchasedSplits, [gid]: lifetime.purchasedSplits[gid] + count };
+  }
+  const newRates = idleRate(next);
+  updated.peakHelpRate = { ...lifetime.peakHelpRate };
+  updated.peakTapPower = { ...lifetime.peakTapPower };
+  for (const gas of GAS_LIST) {
+    const id = gas.id;
+    updated.peakHelpRate[id] = Math.max(updated.peakHelpRate[id], newRates[id]);
+    if (next.unlocked.includes(id))
+      updated.peakTapPower[id] = Math.max(updated.peakTapPower[id], cracklePower(gas, next));
+  }
+  next.lifetime = updated;
   return { state: next, count };
 }

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.25 - Lifetime Stats and early progression
+
+- Show each Stats tile as a current-run value plus a smaller LIFETIME value
+- Preserve total hired helpers and Arc, Volt and Split purchases across Prestige with separate non-resetting counters
+- Track and display best-ever Help Rate and Tap Power per gas; existing gas lifetime production and playtime remain intact
+- Display run crackles and playtime using snapshots recorded on each Prestige reset, while preserving historical lifetime totals
+- Migrate old saves to schema 16 without changing storage keys, wiping existing balances, or inventing historical purchases from previous Prestiges
+- Reduce only the first Finger price from 5 to 2 Neon (50 to 20 starting taps); all later helper costs, gas unlock prices, rates and Prestige thresholds are unchanged
+- Add progression audit notes and regression tests for migration, permanent counters, Prestige transitions and starter pacing
+
 ## 0.12.24 - Mobile purchase and playability polish
 
 - Redesign repeatable shop rows with five wider, full-width-spaced quantity buttons on a dedicated 36px-high second row, while retaining a stable 94px BUY action and inline price
