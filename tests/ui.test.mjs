@@ -637,3 +637,46 @@ test("new pixel helper icons fit within their reserved 28px square", async () =>
     assert.match(html, /max-height:28px/);
   }
 });
+
+test("Stats render a small lifetime value below every run value", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { GAS_LIST } = await import("../src/game/gases.ts");
+  const s = freshSave();
+  s.fingers = 2;
+  s.crackles = 125;
+  s.activeSeconds = 300;
+  s.total.neon = 2000;
+  s.lifetime.helperHires.finger = 13;
+  s.lifetime.peakHelpRate.neon = 3.5;
+  s.lifetime.runStartCrackles = 100;
+  s.lifetime.runStartActiveSeconds = 200;
+  s.prestige.lastTotal.neon = 1500;
+  const markup = renderToStaticMarkup(React.createElement(StatsPanel, {
+    state: s, unlockedGases: [GAS_LIST[0]], rates: { neon: 0.1, argon: 0, xenon: 0, krypton: 0 },
+  }));
+  assert.match(markup, /MAIN: THIS RUN/);
+  assert.match(markup, /LIFETIME 13/);
+  assert.match(markup, /CRACKLES/);
+  assert.match(markup, /LIFETIME 125/);
+  assert.match(markup, /PLASMA EARNED/);
+  assert.match(markup, /BEST EVER/);
+  assert.match(markup, /LIFETIME 3.50\/S/);
+  assert.equal((markup.match(/class="tabular-nums"/g) ?? []).length >= 14, true);
+});
+
+test("Stats retain small lifetime values even when Prestige cleared run helpers and upgrades", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { GAS_LIST } = await import("../src/game/gases.ts");
+  const s = freshSave();
+  s.lifetime.helperHires.finger = 26;
+  s.lifetime.purchasedArcs.neon = 6;
+  s.lifetime.peakTapPower.neon = 2.5;
+  s.prestige.cycles = 2;
+  const markup = renderToStaticMarkup(React.createElement(StatsPanel, {
+    state: s, unlockedGases: [GAS_LIST[0]], rates: { neon: 0, argon: 0, xenon: 0, krypton: 0 },
+  }));
+  assert.match(markup, /LIFETIME 26/);
+  assert.match(markup, /LIFETIME 6/);
+  assert.match(markup, /LIFETIME 2.50/);
+  assert.match(markup, /Older reset history cannot be reconstructed/);
+});
