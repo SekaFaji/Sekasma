@@ -175,6 +175,10 @@ export function migrateSave(old: Record<string, unknown>): GameState {
   // v10 / v9 saves: load as-is (v9 predates splits)
   if (old.v === 16 || old.v === 15 || old.v === 14 || old.v === 13 || old.v === 12 || old.v === 11 || old.v === 10 || old.v === 9) {
     const s = { ...base, ...(old as unknown as GameState) };
+    // Old snapshots never had lifetime counters. Distinguish "not recorded"
+    // from fresh zeroes so older Prestiges are not counted as this run.
+    if (!Object.prototype.hasOwnProperty.call(old, "lifetime"))
+      s.lifetime = undefined as unknown as LifetimeStats;
     if (!s.splits) s.splits = zero3();
     if (typeof s.ghosts !== "number") s.ghosts = 0;
     if (typeof s.stickmen !== "number") s.stickmen = 0;
