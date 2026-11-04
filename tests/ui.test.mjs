@@ -553,3 +553,48 @@ test("every ghost pose and orbit ring stays within the round glass, without edge
     }
   }
 });
+
+test("Stickman pixel-art frames are detailed, palette-safe and visually distinct", async () => {
+  const art = await server.ssrLoadModule("/src/render/sprites.ts");
+  const { STICKMAN_PALETTE } = await server.ssrLoadModule("/src/render/palette.ts");
+  const frames = art.STICKMAN_FRAMES;
+  assert.deepEqual(Object.keys(frames).sort(),
+    ["runA", "runB", "leap", "windup", "punch", "fall", "land"].sort());
+  assert.equal(Object.keys(STICKMAN_PALETTE).length, 10);
+  for (const [name, sprite] of Object.entries(frames)) {
+    assert.equal(sprite.length, 18, `${name} has wrong height`);
+    assert.ok(sprite.every(row => row.length === 15), `${name} must be rectangular`);
+    assert.ok(sprite.join("").includes("4"), `${name} needs skin color`);
+    assert.ok(sprite.join("").includes("5"), `${name} needs visible amber scarf`);
+    assert.ok(sprite.join("").includes("6"), `${name} needs dark boots`);
+    for (const pixel of sprite.join(""))
+      assert.ok(pixel === "." || STICKMAN_PALETTE[pixel], `${name} unknown pixel ${pixel}`);
+  }
+  assert.notDeepEqual(frames.runA, frames.runB);
+  assert.notDeepEqual(frames.windup, frames.punch);
+  assert.ok(frames.punch.join("").includes("8"), "punch needs electric trail");
+  assert.ok(frames.punch.join("").includes("9"), "punch needs electric white-hot core");
+  assert.equal(art.STICKMAN_SPRITE, frames.runA, "retain legacy sprite export");
+});
+
+test("every Stickman animation frame stays inside the 150px game canvas while orbiting and leaping", async () => {
+  const { STICKMAN_FRAMES } = await server.ssrLoadModule("/src/render/sprites.ts");
+  const { helperOrbitRadius } = await server.ssrLoadModule("/src/render/limits.ts");
+  const { CX, CY, R, PX } = await server.ssrLoadModule("/src/render/geometry.ts");
+  for (let ring = 0; ring < 3; ring++) {
+    const base = helperOrbitRadius("stickmen", ring, R) + 2;
+    for (const jump of [0, 0.25, 0.5, 0.75, 1]) {
+      for (let degree = 0; degree < 360; degree++) {
+        const angle = degree * Math.PI / 180;
+        const radius = base - jump * 12;
+        const x = Math.round(CX + Math.cos(angle) * radius) - 7;
+        const y = Math.round(CY + Math.sin(angle) * radius - jump * 3) - 17;
+        for (const [name, frame] of Object.entries(STICKMAN_FRAMES)) {
+          assert.ok(x >= 0 && y >= 0 && x + 15 <= PX && y + 18 <= PX,
+            `${name} clipped at ${degree} degrees, ring ${ring}, jump ${jump}`);
+          assert.equal(frame[0].length, 15);
+        }
+      }
+    }
+  }
+});
