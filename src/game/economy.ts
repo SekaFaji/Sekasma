@@ -209,5 +209,30 @@ export function purchaseUpgrade(
     if (!unlocked) return { state: s, count: 0 };
     next.unlocked = [...s.unlocked, unlocked.id];
   }
+  // Permanent purchase counters are independent of run resets. Copy every
+  // nested counter before writing to preserve the original state object.
+  const lifetime = next.lifetime;
+  const updated = { ...lifetime };
+  if (["finger", "toe", "ghost", "stickman"].includes(kind)) {
+    updated.helperHires = {
+      ...lifetime.helperHires, [kind]: lifetime.helperHires[kind as keyof typeof lifetime.helperHires] + count,
+    };
+  } else if (gid && kind === "filament") {
+    updated.purchasedArcs = { ...lifetime.purchasedArcs, [gid]: lifetime.purchasedArcs[gid] + count };
+  } else if (gid && kind === "voltage") {
+    updated.purchasedVoltage = { ...lifetime.purchasedVoltage, [gid]: lifetime.purchasedVoltage[gid] + count };
+  } else if (gid && kind === "split") {
+    updated.purchasedSplits = { ...lifetime.purchasedSplits, [gid]: lifetime.purchasedSplits[gid] + count };
+  }
+  const newRates = idleRate(next);
+  updated.peakHelpRate = { ...lifetime.peakHelpRate };
+  updated.peakTapPower = { ...lifetime.peakTapPower };
+  for (const gas of GAS_LIST) {
+    const id = gas.id;
+    updated.peakHelpRate[id] = Math.max(updated.peakHelpRate[id], newRates[id]);
+    if (next.unlocked.includes(id))
+      updated.peakTapPower[id] = Math.max(updated.peakTapPower[id], cracklePower(gas, next));
+  }
+  next.lifetime = updated;
   return { state: next, count };
 }
