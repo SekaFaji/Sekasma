@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.23 - Stickman pixel-art overhaul
+
+- Replace tiny in-loop rectangles with seven hand-authored 15x18 Stickman sprite poses: two running strides, leap, wind-up, punch, fall and landing
+- Give Stickmen outlined features, shaded clothing, face detail, an amber scarf, boots and a blue-white electric punch accent
+- Separate pixel-art rendering from the existing pure Stickman motion and strike logic for cleaner code
+- Cache all poses in the shared sprite atlas and flip toward the direction of movement; no generated images or external assets
+- Reposition Stickman orbit rings to prevent the larger frames clipping the canvas on mobile
+- Preserve animation timing, one strike per leap, crack effects, idle earnings, ownership, saves and Prestige upgrades
+- Add animation state, visual frame, palette and 360-degree geometry regression tests
+
 ## 0.12.22 - Spectral Ghost Hand pixel art
 
 - Replace simple Ghost Hand silhouette with a detailed 17x21 hand-pixeled spectral sprite: four fingers, side thumb, shaded palm, creases and tapered wrist
