@@ -453,7 +453,7 @@ test("purchase preview accurately projects helper rates without changing state",
   const s = { ...freshSave(), plasma: { neon: 200, argon: 0, xenon: 0, krypton: 0 } };
   const before = JSON.stringify(s);
   const preview = previewPurchaseImpact(s, "finger", undefined, 5);
-  assert.match(preview.preview, /NEON\/S 0 → 0.023/);
+  assert.match(preview.preview, /NEON\/S 0 → 0.23/);
   const bought = purchaseUpgrade(s, "finger", undefined, 5);
   assert.equal(bought.count, 5);
   assert.ok(Math.abs(idleRate(bought.state).neon - 5 * 0.1 / PRESS_INTERVAL) < 1e-10);
