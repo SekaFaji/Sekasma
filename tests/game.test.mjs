@@ -8,6 +8,8 @@ import { visibleHelperCount, visibleHelperCounts, helperOrbitRadius, helperEffec
 import { advanceStickman, createStickman } from "../src/render/stickmen.ts";
 import { PX, CX, CY, R } from "../src/render/geometry.ts";
 import { plasmaDisplacement } from "../src/render/plasma.ts";
+import { previewPurchaseImpact } from "../src/game/purchasePreview.ts";
+import { idleRate, MAX_BULK_PURCHASE } from "../src/game/economy.ts";
 import { BASE_CAPACITY, CAPACITY_STEP, capacityUpgradeCost, helperCapacity, helperRoom, performPrestige, prestigeReward, runPrestigeScore, upgradeCapacity } from "../src/game/prestige.ts";
 
 test("offline settlement is capped and handles negative time", () => {
@@ -445,4 +447,27 @@ test("Stickman animation visits every pose and emits one punch signal per leap",
   }
   assert.deepEqual([...seen].sort(), ["fall", "land", "leap", "punch", "runA", "runB", "windup"].sort());
   assert.ok(strikes >= 2);
+});
+
+test("purchase preview accurately projects helper rates without changing state", () => {
+  const s = { ...freshSave(), plasma: { neon: 200, argon: 0, xenon: 0, krypton: 0 } };
+  const before = JSON.stringify(s);
+  const preview = previewPurchaseImpact(s, "finger", undefined, 5);
+  assert.match(preview.preview, /NEON\/S 0 → 0.023/);
+  const bought = purchaseUpgrade(s, "finger", undefined, 5);
+  assert.equal(bought.count, 5);
+  assert.ok(Math.abs(idleRate(bought.state).neon - 5 * 0.1 / PRESS_INTERVAL) < 1e-10);
+  assert.equal(JSON.stringify(s), before);
+  assert.match(previewPurchaseImpact({ ...s, unlocked: ["neon", "argon", "xenon", "krypton"] },
+    "toe", undefined, 1).preview, /KRYPTON\/S/);
+  assert.equal(previewPurchaseImpact(s, "gas", undefined, 1), null);
+  assert.equal(previewPurchaseImpact(s, "finger", undefined, 0), null);
+});
+
+test("Arc Split and tiny Volt improvements remain visible in projected tap rates", () => {
+  const s = freshSave();
+  assert.match(previewPurchaseImpact(s, "filament", "neon", 1).preview, /NEON\/T 0.1 → 0.2/);
+  assert.match(previewPurchaseImpact(s, "split", "neon", 1).preview, /NEON\/T 0.1 → 0.15/);
+  assert.match(previewPurchaseImpact(s, "voltage", "neon", 1).preview, /0.1 → 0.10001/);
+  assert.equal(MAX_BULK_PURCHASE, 1000);
 });
