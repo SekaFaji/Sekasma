@@ -12,7 +12,8 @@ import StatsPanel from "./components/StatsPanel";
 import OptionsPanel, { type ResetStep } from "./components/OptionsPanel";
 import PrestigePanel, { type PrestigeConfirmStep } from "./components/PrestigePanel";
 import { GAS_LIST, gasById, nextGas } from "./game/gases";
-import { accrueIdle, accrueOffline, bulkCost, buyMsg, cappedOfflineSeconds, cracklePower, idleRate, purchaseUpgrade } from "./game/economy";
+import { MAX_BULK_PURCHASE, accrueIdle, accrueOffline, bulkCost, buyMsg, cappedOfflineSeconds, cracklePower, idleRate, purchaseUpgrade } from "./game/economy";
+import { previewPurchaseImpact } from "./game/purchasePreview";
 import type { BuyKind } from "./game/economy";
 import { freshSave, loadOpts, loadSave, persist, resetSave, saveOpts } from "./game/save";
 import { measureTick } from "./game/timing";
@@ -35,6 +36,8 @@ export default function App() {
   const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastT = useRef<number | undefined>(undefined);
+  const [purchaseFeedback, setPurchaseFeedback] = useState<{ key: string; message: string } | null>(null);
+  const purchaseFeedbackT = useRef<number | undefined>(undefined);
   const panelScrollRef = useRef<HTMLDivElement | null>(null);
   const scrollPositionsRef = useRef<Record<string, number>>({});
   const [resetStep, setResetStep] = useState<ResetStep>(0);
@@ -149,17 +152,24 @@ export default function App() {
   };
 
   const buy = (kind: BuyKind, gid?: GasId, quantity: BuyQuantity = 1) => {
-    const want = kind === "gas" ? 1 : quantity === "max" ? 1000 : quantity;
-    const pre = bulkCost(stateRef.current, kind, gid, want);
-    setState((s) => purchaseUpgrade(s, kind, gid, want).state);
-    if (pre.count > 0) {
-      buzzNow(12);
-      showToast(
-        kind === "gas"
-          ? `${nextGas(stateRef.current.unlocked)?.name ?? "GAS"} UNLOCKED`
-          : buyMsg(kind, gid, pre.count),
-      );
-    }
+    const want = kind === "gas" ? 1 : quantity === "max" ? MAX_BULK_PURCHASE : quantity;
+    const before = stateRef.current;
+    const pre = bulkCost(before, kind, gid, want);
+    if (pre.count <= 0) return;
+    // Apply changes atomically against the latest React state, just as before.
+    setState(s => purchaseUpgrade(s, kind, gid, want).state);
+    buzzNow(12);
+    const message = kind === "gas"
+      ? `${nextGas(before.unlocked)?.name ?? "GAS"} UNLOCKED`
+      : buyMsg(kind, gid, pre.count);
+    showToast(message);
+    const gain = previewPurchaseImpact(before, kind, gid, pre.count);
+    setPurchaseFeedback({
+      key: gid ? `${kind}:${gid}` : kind,
+      message: kind === "gas" ? message : gain?.gained ?? message,
+    });
+    window.clearTimeout(purchaseFeedbackT.current);
+    purchaseFeedbackT.current = window.setTimeout(() => setPurchaseFeedback(null), 1000);
   };
 
   // Preserve each section's place, including independent upgrade categories.
@@ -298,7 +308,7 @@ export default function App() {
             <UpgradePanel state={state} unlockedGases={unlockedGases} accent={accent}
               upTab={upTab} onUpTabChange={switchUpgradeTab} quantities={quantities}
               onQuantityChange={(key, quantity) => setQuantities((old) => ({ ...old, [key]: quantity }))}
-              onBuy={buy} />
+              onBuy={buy} purchaseFeedback={purchaseFeedback} />
           )}
 
           {tab === "stats" && (

@@ -5,35 +5,37 @@ import InfoRow from "./InfoRow";
 import PixelIcon from "./PixelIcon";
 import { nextGas } from "../game/gases";
 import { SPLIT_CAP, HELPER_POWER, fmtVolts, splitMult, voltMult } from "../game/config";
-import { bulkCost, canAfford, cracklePower, peekCost } from "../game/economy";
+import { MAX_BULK_PURCHASE, bulkCost, canAfford, cracklePower, peekCost } from "../game/economy";
+import { previewPurchaseImpact } from "../game/purchasePreview";
 import type { BuyKind } from "../game/economy";
 import { fmt } from "../utils/format";
 import { helperCapacity } from "../game/prestige";
 import { FINGER_SPRITE, FOOT_SPRITE, GHOST_SPRITE, STICKMAN_SPRITE, GAS_ICON, FIL_ICON, VOLT_ICON, SPLIT_ICON } from "../render/sprites";
-import { SKIN, SKIN_PALETTE, GHOST_PALETTE } from "../render/palette";
+import { SKIN, SKIN_PALETTE, TOE_PALETTE, GHOST_PALETTE, STICKMAN_PALETTE } from "../render/palette";
 import type { Gas, GasId, GameState } from "../game/types";
-
-const STICKMAN_PALETTE = { "0": "#20152e", "1": "#fff2c7", "2": "#ff9d2e" };
 
 export type UpTab = "help" | "gas" | "power";
 
-export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUpTabChange, quantities, onQuantityChange, onBuy }: {
+export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUpTabChange, quantities, onQuantityChange, onBuy, purchaseFeedback }: {
   state: GameState; unlockedGases: Gas[]; accent: string;
   upTab: UpTab; onUpTabChange: (tab: UpTab) => void;
   quantities: Record<string, BuyQuantity>;
   onQuantityChange: (key: string, quantity: BuyQuantity) => void;
   onBuy: (kind: BuyKind, gid?: GasId, quantity?: BuyQuantity) => void;
+  purchaseFeedback?: { key: string; message: string } | null;
 }) {
   const rowKey = (kind: BuyKind, gid?: GasId) => gid ? `${kind}:${gid}` : kind;
   const selected = (kind: BuyKind, gid?: GasId): BuyQuantity =>
     quantities[rowKey(kind, gid)] ?? 1;
   const quote = (kind: BuyKind, gid?: GasId) => {
     const quantity = selected(kind, gid);
-    return bulkCost(state, kind, gid, quantity === "max" ? 1000 : quantity);
+    return bulkCost(state, kind, gid, quantity === "max" ? MAX_BULK_PURCHASE : quantity);
   };
-  const quantityProps = (kind: BuyKind, gid?: GasId) => ({
+  const quantityProps = (kind: BuyKind, gid: GasId | undefined, offeredCount: number) => ({
     quantity: selected(kind, gid),
     onQtyChange: (value: BuyQuantity) => onQuantityChange(rowKey(kind, gid), value),
+    benefit: previewPurchaseImpact(state, kind, gid, Math.max(1, offeredCount))?.preview,
+    purchased: purchaseFeedback?.key === rowKey(kind, gid) ? purchaseFeedback.message : undefined,
   });
   const fingerBuy = quote("finger");
   const toeBuy = quote("toe");
@@ -101,7 +103,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                     cost={fingerBuy.cost}
                     icon={<PixelIcon sprite={FINGER_SPRITE} palette={SKIN_PALETTE} px={2} />}
                     onBuy={() => buy("finger", undefined, selected("finger"))}
-                    {...quantityProps("finger")}
+                    {...quantityProps("finger", undefined, fingerBuy.count)}
                     disabled={fingerBuy.count === 0}
                     nextCost={peekCost(state, "finger")}
                           plasma={state.plasma}
@@ -112,9 +114,9 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                         sub={`POWER ${HELPER_POWER.toe} · OWN ${state.toes}/${helperCapacity(state, "toe")}` +
                           (toeBuy.count > 1 ? ` · +${toeBuy.count}` : "")}
                         cost={toeBuy.cost}
-                        icon={<PixelIcon sprite={FOOT_SPRITE} palette={SKIN_PALETTE} px={3} />}
+                        icon={<PixelIcon sprite={FOOT_SPRITE} palette={TOE_PALETTE} px={3} />}
                         onBuy={() => buy("toe", undefined, selected("toe"))}
-                    {...quantityProps("toe")}
+                    {...quantityProps("toe", undefined, toeBuy.count)}
                         disabled={toeBuy.count === 0}
                         color={SKIN}
                         nextCost={peekCost(state, "toe")}
@@ -126,7 +128,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                           name="BIG TOE"
                           sub="UNLOCKS WITH ARGON GAS"
                           cost={{ argon: 15 }}
-                          icon={<PixelIcon sprite={FOOT_SPRITE} palette={SKIN_PALETTE} px={3} />}
+                          icon={<PixelIcon sprite={FOOT_SPRITE} palette={TOE_PALETTE} px={3} />}
                           onBuy={() => {}}
                           disabled
                           locked
@@ -143,7 +145,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                         cost={ghostBuy.cost}
                         icon={<PixelIcon sprite={GHOST_SPRITE} palette={GHOST_PALETTE} px={3} />}
                         onBuy={() => buy("ghost", undefined, selected("ghost"))}
-                    {...quantityProps("ghost")}
+                    {...quantityProps("ghost", undefined, ghostBuy.count)}
                         disabled={ghostBuy.count === 0}
                         color="#b7b2ff"
                         nextCost={peekCost(state, "ghost")}
@@ -172,7 +174,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                         cost={stickBuy.cost}
                         icon={<PixelIcon sprite={STICKMAN_SPRITE} palette={STICKMAN_PALETTE} px={3} />}
                         onBuy={() => buy("stickman", undefined, selected("stickman"))}
-                        {...quantityProps("stickman")}
+                        {...quantityProps("stickman", undefined, stickBuy.count)}
                         disabled={stickBuy.count === 0}
                         color="#ffd166"
                         nextCost={peekCost(state, "stickman")}
@@ -212,6 +214,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                           cost={nxGas.unlockCost}
                           icon={<PixelIcon sprite={GAS_ICON} color={nxGas.color} px={3} />}
                           onBuy={() => buy("gas")}
+                          purchased={purchaseFeedback?.key === "gas" ? purchaseFeedback.message : undefined}
                           disabled={!canAfford(state, nxGas.unlockCost)}
                           plasma={state.plasma}
                           color={nxGas.color}
@@ -250,7 +253,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                           cost={filBuy.cost}
                           icon={<PixelIcon sprite={FIL_ICON} color={g.color} px={3} />}
                           onBuy={() => buy("filament", g.id, selected("filament", g.id))}
-                          {...quantityProps("filament", g.id)}
+                          {...quantityProps("filament", g.id, filBuy.count)}
                           disabled={filBuy.count === 0}
                           color={g.color}
                           nextCost={peekCost(state, "filament", g.id)}
@@ -263,7 +266,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                           cost={voltBuy.cost}
                           icon={<PixelIcon sprite={VOLT_ICON} color={g.color} px={3} />}
                           onBuy={() => buy("voltage", g.id, selected("voltage", g.id))}
-                          {...quantityProps("voltage", g.id)}
+                          {...quantityProps("voltage", g.id, voltBuy.count)}
                           disabled={voltBuy.count === 0}
                           color={g.color}
                           nextCost={peekCost(state, "voltage", g.id)}
@@ -276,7 +279,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                           cost={splitBuy.cost}
                           icon={<PixelIcon sprite={SPLIT_ICON} color={g.color} px={3} />}
                           onBuy={() => buy("split", g.id, selected("split", g.id))}
-                          {...quantityProps("split", g.id)}
+                          {...quantityProps("split", g.id, splitBuy.count)}
                           disabled={splitBuy.count === 0}
                           color={g.color}
                           nextCost={peekCost(state, "split", g.id)}

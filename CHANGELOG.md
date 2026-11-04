@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.24 - Mobile purchase and playability polish
+
+- Redesign repeatable shop rows with five wider, full-width-spaced quantity buttons on a dedicated 36px-high second row, while retaining a stable 94px BUY action and inline price
+- Show rate previews for the affordable selected purchase: a before-and-after HELP/S or POWER/T value on the newest gas or relevant power gas
+- Flash an upgrade row briefly after successful buying, with a compact visible production gain and a BOUGHT confirmation
+- Correct shop preview icons for the Big Toe and Stickman to use their actual modern skin/pixel palettes
+- Scale every icon to fit a 28px square inside its reserved shop slot without cropping detailed sprites
+- Clarify that MAX purchases up to 1,000 units per action, subject to affordability and existing upgrade/helper caps
+- Keep game progression, pricing formulas, save format, Prestige and all owned helpers unchanged
+- Add tests for precise rate previews (including tiny Volt increases), mobile buy controls, row confirmation and icon bounds
+
 ## 0.12.23 - Stickman pixel-art overhaul
 
 - Replace tiny in-loop rectangles with seven hand-authored 15x18 Stickman sprite poses: two running strides, leap, wind-up, punch, fall and landing

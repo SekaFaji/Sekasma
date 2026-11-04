@@ -244,9 +244,9 @@ test("affordability progress uses an identical fixed-size slot across affordabil
   const poor = renderToStaticMarkup(React.createElement(UpgradeRow, { ...props, disabled: true }));
   const rich = renderToStaticMarkup(React.createElement(UpgradeRow, { ...props, disabled: false }));
   for (const markup of [poor, rich]) {
-    assert.ok(markup.includes('h-[52px]'));
-    assert.ok(markup.includes('h-[10px]'));
-    assert.ok(markup.includes('sekasma-upgrade-sub'));
+    assert.ok(markup.includes('min-h-[54px]'));
+    assert.ok(markup.includes('h-[11px]'));
+    assert.ok(markup.includes('grid-rows-[44px]'));
   }
   assert.match(poor, /role="progressbar"/);
   assert.doesNotMatch(rich, /role="progressbar"/);
@@ -272,7 +272,7 @@ test("all four helper upgrades are rendered as compact rows on HELP", async () =
     state, unlockedGases: GAS_LIST, accent: "#ffd166", upTab: "help",
     onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {},
   }));
-  assert.equal((html.match(/h-\[52px\]/g) ?? []).length, 4);
+  assert.equal((html.match(/min-h-\[89px\]/g) ?? []).length, 4);
   for (const power of [1, 8, 20, 45]) assert.match(html, new RegExp(`POWER ${power} · OWN`));
   assert.doesNotMatch(html, /× FINGER/);
   const app = renderToStaticMarkup(React.createElement(App));
@@ -596,5 +596,44 @@ test("every Stickman animation frame stays inside the 150px game canvas while or
         }
       }
     }
+  }
+});
+
+test("mobile shop rows have bigger quantity buttons and preview purchases", () => {
+  const html = renderToStaticMarkup(React.createElement(UpgradeRow, {
+    name: "FINGER", sub: "POWER 1", icon: "F", cost: { neon: 10 },
+    quantity: "max", onQtyChange() {}, onBuy() {}, disabled: false,
+    benefit: "NEON/S 0.0045 to 0.023",
+  }));
+  assert.match(html, /grid-cols-\[36px_minmax/);
+  assert.match(html, /grid-rows-\[44px_36px\]/);
+  assert.match(html, /h-\[36px\]/);
+  assert.match(html, /Buy maximum FINGER \(up to 1000 per purchase\)/);
+  assert.match(html, /NEON\/S/);
+  assert.match(html, /aria-label="Upgrade price"/);
+  assert.equal((html.match(/aria-pressed=/g) ?? []).length, 5);
+});
+
+test("purchase confirmation displays the real production gain in the same row", () => {
+  const html = renderToStaticMarkup(React.createElement(UpgradeRow, {
+    name: "FINGER", sub: "POWER 1", icon: "F", cost: { neon: 10 },
+    quantity: 1, onQtyChange() {}, onBuy() {}, disabled: false,
+    purchased: "+0.0045 NEON/S",
+  }));
+  assert.match(html, /sekasma-purchase-flash/);
+  assert.match(html, /BOUGHT!/);
+  assert.match(html, /role="status"/);
+});
+
+test("new pixel helper icons fit within their reserved 28px square", async () => {
+  const { default: PixelIcon } = await server.ssrLoadModule("/src/components/PixelIcon.tsx");
+  const { FOOT_SPRITE, GHOST_SPRITE, STICKMAN_SPRITE } = await server.ssrLoadModule("/src/render/sprites.ts");
+  const { TOE_PALETTE, GHOST_PALETTE, STICKMAN_PALETTE } = await server.ssrLoadModule("/src/render/palette.ts");
+  for (const [sprite, palette] of [
+    [FOOT_SPRITE, TOE_PALETTE], [GHOST_SPRITE, GHOST_PALETTE], [STICKMAN_SPRITE, STICKMAN_PALETTE],
+  ]) {
+    const html = renderToStaticMarkup(React.createElement(PixelIcon, { sprite, palette, px: 3 }));
+    assert.match(html, /max-width:28px/);
+    assert.match(html, /max-height:28px/);
   }
 });
