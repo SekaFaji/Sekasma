@@ -23,12 +23,17 @@ export default function PixelIcon({
     ctx.clearRect(0, 0, w, h);
     drawSprite(ctx, sprite, 0, 0, palette ?? { "1": color ?? "#ffffff" });
   }, [sprite, color, palette]);
+  // Fit every sprite (including the new 17x21 Ghost Hand) in the 32px UI slot.
+  const scale = Math.min(px, 28 / sprite[0].length, 28 / sprite.length);
   return (
     <canvas
       ref={ref}
+      aria-hidden="true"
       style={{
-        width: sprite[0].length * px,
-        height: sprite.length * px,
+        width: sprite[0].length * scale,
+        height: sprite.length * scale,
+        maxWidth: 28,
+        maxHeight: 28,
         imageRendering: "pixelated",
         display: "inline-block",
       }}
