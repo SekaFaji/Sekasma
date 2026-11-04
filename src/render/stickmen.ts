@@ -17,8 +17,11 @@ export function createStickman(index: number, time: number): StickmanMotion {
     phase: index * 1.7,
   };
 }
+/** Pose is purely visual: helper income, jump timings and strike signals stay unchanged. */
+export type StickmanFrame = "runA" | "runB" | "leap" | "windup" | "punch" | "fall" | "land";
 export type StickmanPose = {
   angle: number; jump: number; attack: boolean; stride: boolean; strike: boolean;
+  frame: StickmanFrame;
 };
 /** Returns a one-frame strike signal; one strike per leap, not per RAF tick. */
 export function advanceStickman(agent: StickmanMotion, time: number, dt: number): StickmanPose {
@@ -36,8 +39,18 @@ export function advanceStickman(agent: StickmanMotion, time: number, dt: number)
     agent.jumpStart = -1;
     agent.nextJump = time + 1.3 + (agent.phase % 2) * 0.65;
   }
+  const stride = Math.sin(time * 12 + agent.phase) > 0;
+  // Pose selection only; the existing one-hit-per-leap transition is untouched.
+  // The strike frame takes priority when a slower device crosses the impact
+  // threshold in one animation tick.
+  const frame: StickmanFrame = strike ? "punch"
+    : progress < 0 ? (stride ? "runA" : "runB")
+    : progress < 0.22 ? "leap"
+    : progress < 0.4 ? "windup"
+    : progress < 0.57 ? "punch"
+    : progress < 0.88 ? "fall"
+    : "land";
   return {
-    angle: agent.angle, jump, attack, strike,
-    stride: Math.sin(time * 12 + agent.phase) > 0,
+    angle: agent.angle, jump, attack, strike, stride, frame,
   };
 }
