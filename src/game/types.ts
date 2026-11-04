@@ -17,6 +17,19 @@ export type Gas = {
 export type GasRecord = Record<GasId, number>;
 export type HelperId = "finger" | "toe" | "ghost" | "stickman";
 export type HelperRecord = Record<HelperId, number>;
+/** Non-resetting progress; historic purchases are tracked from v0.12.25 onward. */
+export type LifetimeStats = {
+  helperHires: HelperRecord;
+  purchasedArcs: GasRecord;
+  purchasedSplits: GasRecord;
+  purchasedVoltage: GasRecord;
+  peakHelpRate: GasRecord;
+  peakTapPower: GasRecord;
+  runStartCrackles: number;
+  runStartActiveSeconds: number;
+  runStartOfflineSeconds: number;
+};
+
 export type PrestigeProgress = {
   cycles: number;
   sparks: number;
@@ -43,4 +56,5 @@ export type GameState = {
   activeSeconds: number; // cumulative visible/foreground playtime
   offlineSeconds: number; // capped time away, tracked starting with schema 13
   prestige: PrestigeProgress;
+  lifetime: LifetimeStats;
 };
