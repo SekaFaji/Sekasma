@@ -39,11 +39,11 @@ export default function StatsPanel({ state, unlockedGases, rates }: {
         <p className="mb-1 text-[9px] text-white/50">MAIN: THIS RUN · SMALL: LIFETIME</p>
         <div className="grid grid-cols-4 gap-1">
           <StatCard title="CRACKLES" value={String(cracklesThisRun)} lifetime={String(state.crackles)} />
-          <StatCard title="PLAYTIME" value={formatDuration(activeThisRun + offlineThisRun)}
+          <StatCard title="TOTAL PLAYTIME" value={formatDuration(activeThisRun + offlineThisRun)}
             lifetime={formatDuration(state.activeSeconds + state.offlineSeconds)} />
           <StatCard title="ACTIVE ONLINE" value={formatDuration(activeThisRun)}
             lifetime={formatDuration(state.activeSeconds)} />
-          <StatCard title="OFFLINE TIME" value={formatDuration(offlineThisRun)}
+          <StatCard title="OFFLINE PLAYTIME" value={formatDuration(offlineThisRun)}
             lifetime={formatDuration(state.offlineSeconds)} />
           <StatCard title="FINGERS HIRED" value={String(state.fingers)} lifetime={String(ls.helperHires.finger)} />
           <StatCard title="BIG TOES" value={String(state.toes)} lifetime={String(ls.helperHires.toe)} />
