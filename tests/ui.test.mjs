@@ -244,9 +244,9 @@ test("affordability progress uses an identical fixed-size slot across affordabil
   const poor = renderToStaticMarkup(React.createElement(UpgradeRow, { ...props, disabled: true }));
   const rich = renderToStaticMarkup(React.createElement(UpgradeRow, { ...props, disabled: false }));
   for (const markup of [poor, rich]) {
-    assert.ok(markup.includes('h-[52px]'));
-    assert.ok(markup.includes('h-[10px]'));
-    assert.ok(markup.includes('sekasma-upgrade-sub'));
+    assert.ok(markup.includes('min-h-[54px]'));
+    assert.ok(markup.includes('h-[11px]'));
+    assert.ok(markup.includes('grid-rows-[44px]'));
   }
   assert.match(poor, /role="progressbar"/);
   assert.doesNotMatch(rich, /role="progressbar"/);
