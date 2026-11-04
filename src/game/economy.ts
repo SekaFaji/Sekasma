@@ -81,6 +81,8 @@ export const pay = (s: GameState, cost: Partial<GasRecord>) => {
 };
 
 // ---------- Bulk buying (1 / 5 / 10 / 100 / MAX) ----------
+// Upper safety limit for one MAX purchase; helper and upgrade caps still apply.
+export const MAX_BULK_PURCHASE = 1000;
 export type BuyKind = "finger" | "toe" | "ghost" | "stickman" | "filament" | "voltage" | "split" | "gas";
 
 export const addCosts = (a: Partial<GasRecord>, b: Partial<GasRecord>): Partial<GasRecord> => {
