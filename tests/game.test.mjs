@@ -570,3 +570,103 @@ test("v17 lifetime history survives real save and reload without resetting save 
   assert.equal(loadSave().fingers, 2);
   assert.equal(loadSave().lifetime.peakHelpRate.neon, s.lifetime.peakHelpRate.neon);
 }));
+
+test("Voltage uses 20 additive ten-percent levels with per-gas pricing", () => {
+  assert.equal(MAX_VOLT_LEVELS, 20);
+  assert.equal(VOLT_LEVEL_BONUS, 0.10);
+  assert.deepEqual([0, 1, 2, 4, 9, 19].map(level => voltageCost("neon", level).neon),
+    [8, 10, 13, 20, 60, 556]);
+  assert.equal(voltageCost("argon", 0).argon, 20);
+  assert.equal(voltageCost("xenon", 0).xenon, 60);
+  assert.equal(voltageCost("krypton", 0).krypton, 140);
+  assert.ok(Math.abs(voltMult(10) - 2) < 1e-12);
+  assert.ok(Math.abs(voltMult(20) - 3) < 1e-12);
+  assert.ok(Math.abs(voltMult(1, 1000) - 1.21) < 1e-12);
+  const wealthy = freshSave();
+  wealthy.plasma.neon = 1e8;
+  const quote = bulkCost(wealthy, "voltage", "neon", 100);
+  assert.equal(quote.count, 20);
+  assert.equal(quote.cost.neon, 2754);
+  const result = purchaseUpgrade(wealthy, "voltage", "neon", 100).state;
+  assert.equal(result.voltage.neon, 20);
+  assert.equal(result.lifetime.purchasedVoltage.neon, 20);
+  assert.equal(result.legacyVoltage.neon, 0);
+  assert.ok(Math.abs(cracklePower({ id: "neon", baseRate: 0.1 }, result) - 0.3) < 1e-12);
+  assert.equal(bulkCost(result, "voltage", "neon", 1).count, 0);
+  assert.equal(purchaseUpgrade(result, "voltage", "neon", 1).state, result);
+});
+
+test("v16 Voltage migration retains old exact output and separates lifetime step history", () => {
+  const s = freshSave();
+  s.voltage.neon = 1000; // old 0.1000V = x1.10
+  s.filaments.neon = 2;
+  s.splits.neon = 1;
+  s.lifetime.purchasedVoltage.neon = 1200;
+  s.fingers = 3;
+  s.plasma.neon = 2000;
+  const migrated = migrateSave({ ...s, v: 16 });
+  assert.equal(migrated.voltage.neon, 0);
+  assert.equal(migrated.legacyVoltage.neon, 1000);
+  assert.equal(migrated.lifetime.legacyVoltagePurchases.neon, 1200);
+  assert.equal(migrated.lifetime.purchasedVoltage.neon, 0);
+  assert.equal(migrated.plasma.neon, 2000);
+  assert.ok(Math.abs(cracklePower({ id: "neon", baseRate: 0.1 }, migrated) -
+    0.1 * 3 * 1.1 * 1.5) < 1e-12);
+  const again = migrateSave({ ...migrated, v: 17 });
+  assert.equal(again.legacyVoltage.neon, 1000);
+  assert.equal(again.voltage.neon, 0);
+  assert.equal(again.lifetime.legacyVoltagePurchases.neon, 1200);
+  const next = purchaseUpgrade(again, "voltage", "neon", 1).state;
+  assert.equal(next.voltage.neon, 1);
+  assert.equal(next.lifetime.purchasedVoltage.neon, 1);
+  assert.equal(next.lifetime.legacyVoltagePurchases.neon, 1200);
+  assert.ok(Math.abs(cracklePower({ id: "neon", baseRate: 0.1 }, next) -
+    0.1 * 3 * 1.1 * 1.5 * 1.1) < 1e-12);
+});
+
+test("Prestige resets legacy micro-volts and new levels but preserves both lifetime records", () => {
+  const s = freshSave();
+  s.unlocked = ["neon", "argon", "xenon", "krypton"];
+  s.total.krypton = 3000;
+  s.legacyVoltage.neon = 1000;
+  s.lifetime.legacyVoltagePurchases.neon = 1400;
+  s.plasma.neon = 1000;
+  const bought = purchaseUpgrade(s, "voltage", "neon", 2).state;
+  const next = performPrestige(bought);
+  assert.equal(next.voltage.neon, 0);
+  assert.equal(next.legacyVoltage.neon, 0);
+  assert.equal(next.lifetime.purchasedVoltage.neon, 2);
+  assert.equal(next.lifetime.legacyVoltagePurchases.neon, 1400);
+  assert.equal(next.lifetime.peakTapPower.neon, bought.lifetime.peakTapPower.neon);
+  assert.ok(Math.abs(voltMult(next.voltage.neon, next.legacyVoltage.neon) - 1) < 1e-12);
+});
+
+test("first legacy Voltage load stores an untouched snapshot through later autosaves", () => withStorage((items) => {
+  const prior = freshSave();
+  prior.voltage.neon = 1234;
+  prior.lifetime.purchasedVoltage.neon = 3456;
+  const raw = JSON.stringify({ ...prior, v: 16 });
+  items.set(SAVE_KEY, raw);
+  const migrated = loadSave();
+  assert.equal(migrated.legacyVoltage.neon, 1234);
+  assert.equal(migrated.lifetime.legacyVoltagePurchases.neon, 3456);
+  assert.equal(items.get(PRE_VOLTAGE_BACKUP_KEY), raw);
+  assert.equal(persist(migrated), true);
+  assert.equal(persist({ ...migrated, fingers: 3 }), true);
+  assert.equal(loadSave().legacyVoltage.neon, 1234);
+  assert.equal(items.get(PRE_VOLTAGE_BACKUP_KEY), raw);
+  assert.equal(JSON.parse(items.get(SAVE_KEY)).v, 17);
+  resetSave();
+  assert.equal(items.has(PRE_VOLTAGE_BACKUP_KEY), false);
+}));
+
+test("new Voltage levels visibly improve tap rate previews and migrate legacy modifiers", () => {
+  const base = freshSave();
+  assert.match(previewPurchaseImpact(base, "voltage", "neon", 1).preview, /0.1 → 0.11/);
+  const upgraded = purchaseUpgrade({ ...base, plasma: { ...base.plasma, neon: 100 } },
+    "voltage", "neon", 2).state;
+  assert.equal(upgraded.voltage.neon, 2);
+  assert.match(previewPurchaseImpact(upgraded, "voltage", "neon", 1).preview, /0.12 → 0.13/);
+  const old = migrateSave({ ...base, voltage: { ...base.voltage, neon: 1000 }, v: 16 });
+  assert.match(previewPurchaseImpact(old, "voltage", "neon", 1).preview, /0.11 → 0.121/);
+});
