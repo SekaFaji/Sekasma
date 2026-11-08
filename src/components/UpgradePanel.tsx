@@ -10,9 +10,10 @@ import { previewPurchaseImpact } from "../game/purchasePreview";
 import type { BuyKind } from "../game/economy";
 import { fmt } from "../utils/format";
 import { helperCapacity } from "../game/prestige";
+import { HELPER_CATALOG, helperOwned, helperUnlocked } from "../game/helpers";
 import { FINGER_SPRITE, FOOT_SPRITE, GHOST_SPRITE, STICKMAN_SPRITE, GAS_ICON, FIL_ICON, VOLT_ICON, SPLIT_ICON } from "../render/sprites";
-import { SKIN, SKIN_PALETTE, TOE_PALETTE, GHOST_PALETTE, STICKMAN_PALETTE } from "../render/palette";
-import type { Gas, GasId, GameState } from "../game/types";
+import { SKIN_PALETTE, TOE_PALETTE, GHOST_PALETTE, STICKMAN_PALETTE } from "../render/palette";
+import type { Gas, GasId, GameState, HelperId } from "../game/types";
 
 export type UpTab = "help" | "gas" | "power";
 
@@ -37,22 +38,19 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
     benefit: previewPurchaseImpact(state, kind, gid, Math.max(1, offeredCount))?.preview,
     purchased: purchaseFeedback?.key === rowKey(kind, gid) ? purchaseFeedback.message : undefined,
   });
-  const fingerBuy = quote("finger");
-  const toeBuy = quote("toe");
-  const ghostBuy = quote("ghost");
-  const stickBuy = quote("stickman");
-  const argonUnlocked = state.unlocked.includes("argon");
-  const xenonUnlocked = state.unlocked.includes("xenon");
-  const kryptonUnlocked = state.unlocked.includes("krypton");
+  const helperImages: Record<HelperId, { sprite: string[]; palette: Record<string, string> }> = {
+    finger: { sprite: FINGER_SPRITE, palette: SKIN_PALETTE },
+    toe: { sprite: FOOT_SPRITE, palette: TOE_PALETTE },
+    ghost: { sprite: GHOST_SPRITE, palette: GHOST_PALETTE },
+    stickman: { sprite: STICKMAN_SPRITE, palette: STICKMAN_PALETTE },
+  };
   const nxGas = nextGas(state.unlocked);
 
   // afford dots for sub-tabs (shown only on tabs you're NOT looking at)
   const powerKinds: BuyKind[] = ["filament", "voltage", "split"];
   const subDots: Record<UpTab, boolean> = {
-    help:
-      fingerBuy.count > 0 || (argonUnlocked && toeBuy.count > 0) ||
-      (xenonUnlocked && ghostBuy.count > 0) ||
-      (kryptonUnlocked && stickBuy.count > 0),
+    help: HELPER_CATALOG.some(helper =>
+      helperUnlocked(state, helper.id) && quote(helper.id).count > 0),
     gas: !!nxGas && canAfford(state, nxGas.unlockCost),
     power: unlockedGases.some((g) => powerKinds.some((k) => bulkCost(state, k, g.id, 1).count > 0)),
   };
@@ -96,101 +94,32 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
               <div id={`upgrade-panel-${upTab}`} role="tabpanel" aria-labelledby={`upgrade-tab-${upTab}`} className="flex flex-col gap-1">
               {upTab === "help" && (
                 <>
-                  <UpgradeRow
-                    name="FINGER"
-                    sub={`POWER ${HELPER_POWER.finger} · OWN ${state.fingers}/${helperCapacity(state, "finger")}` +
-                      (fingerBuy.count > 1 ? ` · +${fingerBuy.count}` : "")}
-                    cost={fingerBuy.cost}
-                    icon={<PixelIcon sprite={FINGER_SPRITE} palette={SKIN_PALETTE} px={2} />}
-                    onBuy={() => buy("finger", undefined, selected("finger"))}
-                    {...quantityProps("finger", undefined, fingerBuy.count)}
-                    disabled={fingerBuy.count === 0}
-                    nextCost={peekCost(state, "finger")}
-                          plasma={state.plasma}
-                  />
-                  {argonUnlocked
-                    ? <UpgradeRow
-                        name="BIG TOE"
-                        sub={`POWER ${HELPER_POWER.toe} · OWN ${state.toes}/${helperCapacity(state, "toe")}` +
-                          (toeBuy.count > 1 ? ` · +${toeBuy.count}` : "")}
-                        cost={toeBuy.cost}
-                        icon={<PixelIcon sprite={FOOT_SPRITE} palette={TOE_PALETTE} px={3} />}
-                        onBuy={() => buy("toe", undefined, selected("toe"))}
-                    {...quantityProps("toe", undefined, toeBuy.count)}
-                        disabled={toeBuy.count === 0}
-                        color={SKIN}
-                        nextCost={peekCost(state, "toe")}
-                          plasma={state.plasma}
-                      />
-                    : (
-                      <React.Fragment>
-                        <UpgradeRow
-                          name="BIG TOE"
-                          sub="UNLOCKS WITH ARGON GAS"
-                          cost={{ argon: 15 }}
-                          icon={<PixelIcon sprite={FOOT_SPRITE} palette={TOE_PALETTE} px={3} />}
-                          onBuy={() => {}}
-                          disabled
-                          locked
-                          plasma={state.plasma}
-                          unlockCost={nxGas?.unlockCost}
-                        />
-                      </React.Fragment>
-                    )}
-                  {xenonUnlocked
-                    ? <UpgradeRow
-                        name="GHOST HAND"
-                        sub={`POWER ${HELPER_POWER.ghost} · OWN ${state.ghosts}/${helperCapacity(state, "ghost")}` +
-                          (ghostBuy.count > 1 ? ` · +${ghostBuy.count}` : "")}
-                        cost={ghostBuy.cost}
-                        icon={<PixelIcon sprite={GHOST_SPRITE} palette={GHOST_PALETTE} px={3} />}
-                        onBuy={() => buy("ghost", undefined, selected("ghost"))}
-                    {...quantityProps("ghost", undefined, ghostBuy.count)}
-                        disabled={ghostBuy.count === 0}
-                        color="#b7b2ff"
-                        nextCost={peekCost(state, "ghost")}
-                          plasma={state.plasma}
-                      />
-                    : (
-                      <React.Fragment>
-                        <UpgradeRow
-                          name="GHOST HAND"
-                          sub="UNLOCKS WITH XENON GAS"
-                          cost={{ xenon: 80 }}
-                          icon={<PixelIcon sprite={GHOST_SPRITE} palette={GHOST_PALETTE} px={3} />}
-                          onBuy={() => {}}
-                          disabled
-                          locked
-                          plasma={state.plasma}
-                          unlockCost={nxGas?.unlockCost}
-                        />
-                      </React.Fragment>
-                    )}
-                  {kryptonUnlocked
-                    ? <UpgradeRow
-                        name="STICKMAN"
-                        sub={`POWER ${HELPER_POWER.stickman} · OWN ${state.stickmen}/${helperCapacity(state, "stickman")}` +
-                          (stickBuy.count > 1 ? ` · +${stickBuy.count}` : "")}
-                        cost={stickBuy.cost}
-                        icon={<PixelIcon sprite={STICKMAN_SPRITE} palette={STICKMAN_PALETTE} px={3} />}
-                        onBuy={() => buy("stickman", undefined, selected("stickman"))}
-                        {...quantityProps("stickman", undefined, stickBuy.count)}
-                        disabled={stickBuy.count === 0}
-                        color="#ffd166"
-                        nextCost={peekCost(state, "stickman")}
+                  {HELPER_CATALOG.map(helper => {
+                    const unlocked = helperUnlocked(state, helper.id);
+                    const offer = unlocked ? quote(helper.id) : null;
+                    const image = helperImages[helper.id];
+                    const own = helperOwned(state, helper.id);
+                    return (
+                      <UpgradeRow
+                        key={helper.id}
+                        name={helper.name}
+                        sub={unlocked
+                          ? `POWER ${helper.power} · OWN ${own}/${helperCapacity(state, helper.id)}` +
+                            (offer && offer.count > 1 ? ` · +${offer.count}` : "")
+                          : `UNLOCKS WITH ${helper.nativeGas.toUpperCase()} GAS`}
+                        cost={offer?.cost ?? peekCost(state, helper.id)}
+                        icon={<PixelIcon sprite={image.sprite} palette={image.palette} px={helper.iconPixelScale} />}
+                        onBuy={() => { if (unlocked) buy(helper.id, undefined, selected(helper.id)); }}
+                        {...(unlocked ? quantityProps(helper.id, undefined, offer?.count ?? 0) : {})}
+                        disabled={!unlocked || !offer || offer.count === 0}
+                        locked={!unlocked}
+                        color={helper.shopColor}
+                        nextCost={unlocked ? peekCost(state, helper.id) : undefined}
                         plasma={state.plasma}
+                        unlockCost={!unlocked ? nxGas?.unlockCost : undefined}
                       />
-                    : <UpgradeRow
-                        name="STICKMAN"
-                        sub="UNLOCKS WITH KRYPTON GAS"
-                        cost={{ krypton: 120 }}
-                        icon={<PixelIcon sprite={STICKMAN_SPRITE} palette={STICKMAN_PALETTE} px={3} />}
-                        onBuy={() => {}}
-                        disabled
-                        locked
-                        plasma={state.plasma}
-                        unlockCost={nxGas?.unlockCost}
-                      />}
+                    );
+                  })}
                 </>
               )}
 
