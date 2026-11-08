@@ -22,7 +22,8 @@ export type LifetimeStats = {
   helperHires: HelperRecord;
   purchasedArcs: GasRecord;
   purchasedSplits: GasRecord;
-  purchasedVoltage: GasRecord;
+  purchasedVoltage: GasRecord; // all new Voltage levels purchased, across runs
+  legacyVoltagePurchases: GasRecord; // old micro-volt step history, read-only
   peakHelpRate: GasRecord;
   peakTapPower: GasRecord;
   runStartCrackles: number;
@@ -43,7 +44,8 @@ export type GameState = {
   plasma: GasRecord; // one currency per gas
   total: GasRecord;
   crackles: number;
-  voltage: GasRecord; // volt STEPS per gas (each = +0.0001V output)
+  voltage: GasRecord; // new +10% Voltage levels per gas (0..20)
+  legacyVoltage: GasRecord; // grandfathered micro-volt steps, current run only
   fingers: number;
   toes: number;
   ghosts: number;
