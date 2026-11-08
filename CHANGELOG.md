@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.27 - Expandable helper catalog foundation
+
+- Create an ordered helper registry defining each existing helper's gas, price curve, unlock, power, visual type, starting capacity, Prestige capacity increment and shop labels
+- Route helper bulk buying, next costs, income, purchase feedback, capacity lookups, upgrade previews, shop rows and Stats labels through the shared definitions
+- Preserve the same four helpers, pixel-art visuals, saved ownership fields, lifetime counters, prices, gas unlocks and Prestige behavior without introducing any new content in this stability patch
+- Add compatibility tests covering all mixed-gas price thresholds, purchase deductions, helper production, save reload, Prestige resets and locked UI
+- Prepare the next content release for two more Neon helpers and staged gas progression, with a separate versioned save migration
+
 ## 0.12.26 - Meaningful Voltage levels and safe save migration
 
 - Replace micro-volt purchases with 20 per-gas Voltage levels, each adding +10% base power within the Voltage multiplier (linear stacking)

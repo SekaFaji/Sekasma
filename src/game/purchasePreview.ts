@@ -2,7 +2,8 @@
  * Pure, cost-free purchase previews for the upgrade list.
  * These are projections, not purchases or changes to game economy or saves.
  */
-import { HELPER_POWER, PRESS_INTERVAL } from "./config.ts";
+import { PRESS_INTERVAL } from "./config.ts";
+import { helperDefinition, isHelperId } from "./helpers.ts";
 import { cracklePower, idleRate, type BuyKind } from "./economy.ts";
 import { gasById } from "./gases.ts";
 import type { GasId, GameState } from "./types.ts";
@@ -35,13 +36,13 @@ export function previewPurchaseImpact(
   const focus = gid ?? state.unlocked[state.unlocked.length - 1];
   if (!focus || !state.unlocked.includes(focus)) return null;
   const gas = gasById(focus);
-  const helper = kind === "finger" || kind === "toe" || kind === "ghost" || kind === "stickman";
+  const helper = isHelperId(kind);
   const unit = helper ? "/S" : "/T";
   let before: number;
   let after: number;
   if (helper) {
     before = idleRate(state)[focus];
-    after = before + (units * HELPER_POWER[kind] * cracklePower(gas, state)) / PRESS_INTERVAL;
+    after = before + (units * helperDefinition(kind).power * cracklePower(gas, state)) / PRESS_INTERVAL;
   } else {
     before = cracklePower(gas, state);
     const key = kind === "filament" ? "filaments" : kind === "voltage" ? "voltage" : "splits";

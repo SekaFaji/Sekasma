@@ -5,10 +5,8 @@
 import { GAS_LIST, gasById, nextGas } from "./gases.ts";
 import {
   FIL_BASE,
-  HELPER_POWER,
   MAX_VOLT_LEVELS,
   VOLT_COST_GROWTH,
-  MIX_LV,
   PRESS_INTERVAL,
   OFFLINE_CAP_S,
   SPLIT_BASE,
@@ -20,34 +18,18 @@ import {
 } from "./config.ts";
 import type { Gas, GasId, GasRecord, GameState } from "./types.ts";
 import { helperRoom } from "./prestige.ts";
+import { HELPER_CATALOG, helperCost, helperDefinition, helperOwned, isHelperId } from "./helpers.ts";
 
-export const fingerCost = (n: number, unlocked: GasId[]): Partial<GasRecord> => {
-  // One-time first hire discount per run: 20 taps instead of 50 at 0.1 Neon/tap.
-  const c: Partial<GasRecord> = { neon: n === 0 ? 2 : Math.ceil(5 * Math.pow(1.18, n)) };
-  if (n >= MIX_LV.argon && unlocked.includes("argon"))
-    c.argon = Math.ceil(3 * Math.pow(1.15, n));
-  if (n >= MIX_LV.xenon && unlocked.includes("xenon"))
-    c.xenon = Math.ceil(2 * Math.pow(1.12, n));
-  if (n >= MIX_LV.krypton && unlocked.includes("krypton"))
-    c.krypton = Math.ceil(Math.pow(1.1, n));
-  return c;
-};
-export const toeCost = (n: number, unlocked: GasId[]): Partial<GasRecord> => {
-  const c: Partial<GasRecord> = { argon: Math.ceil(15 * Math.pow(1.3, n)) };
-  if (n >= MIX_LV.argon)
-    c.neon = Math.ceil(8 * Math.pow(1.15, n));
-  if (n >= MIX_LV.xenon && unlocked.includes("xenon"))
-    c.xenon = Math.ceil(4 * Math.pow(1.12, n));
-  if (n >= MIX_LV.krypton && unlocked.includes("krypton"))
-    c.krypton = Math.ceil(2 * Math.pow(1.1, n));
-  return c;
-};
-export const ghostCost = (n: number): Partial<GasRecord> => ({
-  xenon: Math.ceil(80 * Math.pow(1.45, n)),
-});
-export const stickmanCost = (n: number): Partial<GasRecord> => ({
-  krypton: Math.ceil(120 * Math.pow(1.5, n)),
-});
+// Compatibility exports for callers and tests. Prices are defined in helpers.ts.
+export const fingerCost = (n: number, unlocked: GasId[]): Partial<GasRecord> =>
+  helperCost("finger", n, unlocked);
+export const toeCost = (n: number, unlocked: GasId[]): Partial<GasRecord> =>
+  helperCost("toe", n, unlocked);
+export const ghostCost = (n: number): Partial<GasRecord> =>
+  helperCost("ghost", n, []);
+export const stickmanCost = (n: number): Partial<GasRecord> =>
+  helperCost("stickman", n, []);
+
 export const splitCost = (g: GasId, n: number): Partial<GasRecord> => ({
   [g]: Math.ceil(SPLIT_BASE[g] * Math.pow(2.2, n)),
 } as Partial<GasRecord>);
@@ -65,12 +47,12 @@ export const cracklePower = (g: Gas, s: GameState) =>
 // idle income per gas = hired help pressing around the clock
 export const idleRate = (s: GameState): GasRecord => {
   const out = zero3();
+  const combinedHelp = HELPER_CATALOG.reduce(
+    (power, helper) => power + helperOwned(s, helper.id) * helper.power, 0,
+  );
   for (const g of GAS_LIST) {
     if (!s.unlocked.includes(g.id)) continue;
-    out[g.id] =
-      ((s.fingers * HELPER_POWER.finger + s.toes * HELPER_POWER.toe +
-        s.ghosts * HELPER_POWER.ghost + s.stickmen * HELPER_POWER.stickman) * cracklePower(g, s)) /
-      PRESS_INTERVAL;
+    out[g.id] = (combinedHelp * cracklePower(g, s)) / PRESS_INTERVAL;
   }
   return out;
 };
@@ -103,10 +85,8 @@ export const bulkCost = (
   let n = 0;
   while (n < count) {
     let c: Partial<GasRecord> | null = null;
-    if (kind === "finger" && n < helperRoom(s, "finger")) c = fingerCost(s.fingers + n, s.unlocked);
-    if (kind === "toe" && n < helperRoom(s, "toe")) c = toeCost(s.toes + n, s.unlocked);
-    if (kind === "ghost" && n < helperRoom(s, "ghost")) c = ghostCost(s.ghosts + n);
-    if (kind === "stickman" && n < helperRoom(s, "stickman")) c = stickmanCost(s.stickmen + n);
+    if (isHelperId(kind) && n < helperRoom(s, kind))
+      c = helperCost(kind, helperOwned(s, kind) + n, s.unlocked);
     if (kind === "filament" && gid)
       c = s.filaments[gid] + n >= gasById(gid).cap ? null : filamentCost(gid, s.filaments[gid] + n);
     if (kind === "voltage" && gid)
@@ -126,10 +106,8 @@ export const bulkCost = (
 
 // price of the next single unit — shown when you can't afford any
 export function peekCost(s: GameState, kind: BuyKind, gid?: GasId): Partial<GasRecord> {
-  if (kind === "finger") return helperRoom(s, "finger") ? fingerCost(s.fingers, s.unlocked) : {};
-  if (kind === "toe") return helperRoom(s, "toe") ? toeCost(s.toes, s.unlocked) : {};
-  if (kind === "ghost") return helperRoom(s, "ghost") ? ghostCost(s.ghosts) : {};
-  if (kind === "stickman") return helperRoom(s, "stickman") ? stickmanCost(s.stickmen) : {};
+  if (isHelperId(kind)) return helperRoom(s, kind)
+    ? helperCost(kind, helperOwned(s, kind), s.unlocked) : {};
   if (kind === "filament" && gid)
     return s.filaments[gid] >= gasById(gid).cap ? {} : filamentCost(gid, s.filaments[gid]);
   if (kind === "voltage" && gid)
@@ -142,10 +120,10 @@ export function peekCost(s: GameState, kind: BuyKind, gid?: GasId): Partial<GasR
 
 export function buyMsg(kind: BuyKind, gid: GasId | undefined, n: number): string {
   const s = (base: string) => (n > 1 ? base + "S" : base);
-  if (kind === "finger") return `+${n} ${s("FINGER")} HIRED`;
-  if (kind === "toe") return n > 1 ? `+${n} FEET HIRED` : "+1 FOOT HIRED";
-  if (kind === "ghost") return n > 1 ? `+${n} GHOST HANDS` : "+1 GHOST HAND";
-  if (kind === "stickman") return n > 1 ? `+${n} STICKMEN` : "+1 STICKMAN";
+  if (isHelperId(kind)) {
+    const helper = helperDefinition(kind);
+    return `+${n} ${n > 1 ? helper.hiredMany : helper.hiredOne}`;
+  }
   if (kind === "filament") return `+${n} ${gasById(gid!).name} ${s("ARC")}`;
   if (kind === "voltage") return `+${n} ${s("VOLT STEP")}`;
   return `+${n} ${s("BRANCH")}`;
@@ -196,10 +174,8 @@ export function purchaseUpgrade(
   if (count === 0) return { state: s, count: 0 };
   const next: GameState = { ...s, plasma: { ...s.plasma } };
   pay(next, cost);
-  if (kind === "finger") next.fingers = s.fingers + count;
-  if (kind === "toe") next.toes = s.toes + count;
-  if (kind === "ghost") next.ghosts = s.ghosts + count;
-  if (kind === "stickman") next.stickmen = s.stickmen + count;
+  if (isHelperId(kind))
+    next[helperDefinition(kind).saveField] = helperOwned(s, kind) + count;
   if (kind === "filament" && gid)
     next.filaments = { ...s.filaments, [gid]: s.filaments[gid] + count };
   if (kind === "voltage" && gid)
@@ -215,9 +191,9 @@ export function purchaseUpgrade(
   // nested counter before writing to preserve the original state object.
   const lifetime = next.lifetime;
   const updated = { ...lifetime };
-  if (["finger", "toe", "ghost", "stickman"].includes(kind)) {
+  if (isHelperId(kind)) {
     updated.helperHires = {
-      ...lifetime.helperHires, [kind]: lifetime.helperHires[kind as keyof typeof lifetime.helperHires] + count,
+      ...lifetime.helperHires, [kind]: lifetime.helperHires[kind] + count,
     };
   } else if (gid && kind === "filament") {
     updated.purchasedArcs = { ...lifetime.purchasedArcs, [gid]: lifetime.purchasedArcs[gid] + count };

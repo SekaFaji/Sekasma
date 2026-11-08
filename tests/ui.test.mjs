@@ -716,3 +716,31 @@ test("Voltage Stats show current levels and separate old-step lifetime history",
   assert.match(html, /X1.32/);
   assert.match(html, /OLD 1500 STEPS/);
 });
+
+test("HELP tab renders each existing helper from the catalog with current lock rules", async () => {
+  const { HELPER_CATALOG } = await server.ssrLoadModule("/src/game/helpers.ts");
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const state = freshSave();
+  const props = {
+    state, unlockedGases: [gasById("neon")], accent: "#ff5ec8",
+    upTab: "help", onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {},
+  };
+  const html = renderToStaticMarkup(React.createElement(UpgradePanel, props));
+  assert.equal(HELPER_CATALOG.length, 4);
+  for (const helper of HELPER_CATALOG) assert.match(html, new RegExp(helper.name));
+  // Each locked helper appears once in visible text and once in its accessible title.
+  assert.equal((html.match(/UNLOCKS WITH /g) ?? []).length, 6);
+  assert.match(html, /POWER 1 · OWN 0\/30/);
+  assert.match(html, /UNLOCKS WITH ARGON GAS/);
+  assert.match(html, /UNLOCKS WITH XENON GAS/);
+  assert.match(html, /UNLOCKS WITH KRYPTON GAS/);
+  const unlocked = { ...state, unlocked: ["neon", "argon", "xenon", "krypton"] };
+  const all = renderToStaticMarkup(React.createElement(UpgradePanel, {
+    ...props, state: unlocked, unlockedGases: unlocked.unlocked.map(gasById),
+  }));
+  assert.doesNotMatch(all, /UNLOCKS WITH /);
+  assert.match(all, /POWER 8 · OWN 0\/25/);
+  assert.match(all, /POWER 20 · OWN 0\/20/);
+  assert.match(all, /POWER 45 · OWN 0\/15/);
+});
