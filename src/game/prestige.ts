@@ -1,10 +1,11 @@
 /** Prestige V1: permanent individual helper capacity, with safe legacy migration. */
 import { zero3 } from "./config.ts";
-import type { GameState, HelperId, HelperRecord, PrestigeProgress } from "./types.ts";
+import type { GameState, HelperId, PrestigeProgress } from "./types.ts";
+import { BASE_HELPER_CAPACITY, HELPER_CAPACITY_STEP, HELPER_IDS, helperOwned } from "./helpers.ts";
 
-export const HELPERS: readonly HelperId[] = ["finger", "toe", "ghost", "stickman"];
-export const BASE_CAPACITY: HelperRecord = { finger: 30, toe: 25, ghost: 20, stickman: 15 };
-export const CAPACITY_STEP: HelperRecord = { finger: 10, toe: 5, ghost: 5, stickman: 3 };
+export const HELPERS: readonly HelperId[] = HELPER_IDS;
+export const BASE_CAPACITY = BASE_HELPER_CAPACITY;
+export const CAPACITY_STEP = HELPER_CAPACITY_STEP;
 export const MIN_PRESTIGE_SCORE = 100_000;
 
 export function freshPrestige(): PrestigeProgress {
@@ -15,16 +16,13 @@ export function freshPrestige(): PrestigeProgress {
     lastTotal: zero3(),
   };
 }
-const owned = (s: GameState, kind: HelperId): number =>
-  kind === "finger" ? s.fingers : kind === "toe" ? s.toes
-  : kind === "ghost" ? s.ghosts : s.stickmen;
 
 export function helperCapacity(s: GameState, kind: HelperId): number {
   const p = s.prestige;
   return Math.max(BASE_CAPACITY[kind], p.legacyCapacity[kind]) + CAPACITY_STEP[kind] * p.capacityLevels[kind];
 }
 export function helperRoom(s: GameState, kind: HelperId): number {
-  return Math.max(0, helperCapacity(s, kind) - owned(s, kind));
+  return Math.max(0, helperCapacity(s, kind) - helperOwned(s, kind));
 }
 export function capacityUpgradeCost(s: GameState, kind: HelperId): number {
   return (s.prestige.capacityLevels[kind] + 1) ** 2;
