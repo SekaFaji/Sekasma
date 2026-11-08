@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.26 - Meaningful Voltage levels and safe save migration
+
+- Replace micro-volt purchases with 20 per-gas Voltage levels, each adding +10% base power within the Voltage multiplier (linear stacking)
+- New Voltage prices: Neon 8, Argon 20, Xenon 60, Krypton 140; next level grows by 1.25x (rounded up)
+- Keep the existing Arc and Split income curves unchanged while making Voltage a useful repeatable purchase
+- Migrate all v16 and earlier micro-volt levels to a separate current-run legacy modifier, preserving the old production multiplier exactly; legacy modifier resets on Prestige
+- Keep historical micro-volt purchase totals separate from new Voltage level lifetime purchases and retain peak production statistics
+- Preserve a pre-migration localStorage snapshot in a dedicated key before the first old-save conversion; internal schema becomes v17 with existing save slots unchanged
+- Clarify level count, combined multiplier and legacy bonus in the shop; Stats display lifetime new levels and historical legacy steps
+- Show purchased Arc stream counts beyond the former 15-stream limit and all 8 purchased Split branches; add a bounded Voltage arc-liveliness effect
+- Add migration, pricing, capped purchases, preview, Prestige, backup and UI tests; do not change gas unlocks, helper income, Prestige thresholds or existing Arc/Split prices
+
 ## 0.12.25 - Lifetime Stats and early progression
 
 - Show each Stats tile as a current-run value plus a smaller LIFETIME value
