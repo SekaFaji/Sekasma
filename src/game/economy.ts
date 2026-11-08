@@ -18,7 +18,7 @@ import {
 } from "./config.ts";
 import type { Gas, GasId, GasRecord, GameState } from "./types.ts";
 import { helperRoom } from "./prestige.ts";
-import { HELPER_CATALOG, helperCost, helperDefinition, helperOwned, isHelperId, withHelperOwned } from "./helpers.ts";
+import { HELPER_CATALOG, helperCost, helperDefinition, helperOwned, isHelperId } from "./helpers.ts";
 
 // Compatibility exports for callers and tests. Prices are defined in helpers.ts.
 export const fingerCost = (n: number, unlocked: GasId[]): Partial<GasRecord> =>
@@ -175,7 +175,7 @@ export function purchaseUpgrade(
   const next: GameState = { ...s, plasma: { ...s.plasma } };
   pay(next, cost);
   if (isHelperId(kind))
-    Object.assign(next, withHelperOwned(s, kind, helperOwned(s, kind) + count));
+    next[helperDefinition(kind).saveField] = helperOwned(s, kind) + count;
   if (kind === "filament" && gid)
     next.filaments = { ...s.filaments, [gid]: s.filaments[gid] + count };
   if (kind === "voltage" && gid)
