@@ -114,3 +114,8 @@ export const BASE_HELPER_CAPACITY: HelperRecord = Object.fromEntries(
 export const HELPER_CAPACITY_STEP: HelperRecord = Object.fromEntries(
   HELPER_CATALOG.map(helper => [helper.id, helper.capacityStep]),
 ) as HelperRecord;
+
+/** Runtime type guard for purchase kinds shared with the economy. */
+export function isHelperId(kind: string): kind is HelperId {
+  return Object.prototype.hasOwnProperty.call(BY_ID, kind);
+}
