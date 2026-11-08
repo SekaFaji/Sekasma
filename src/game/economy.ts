@@ -120,10 +120,10 @@ export function peekCost(s: GameState, kind: BuyKind, gid?: GasId): Partial<GasR
 
 export function buyMsg(kind: BuyKind, gid: GasId | undefined, n: number): string {
   const s = (base: string) => (n > 1 ? base + "S" : base);
-  if (kind === "finger") return `+${n} ${s("FINGER")} HIRED`;
-  if (kind === "toe") return n > 1 ? `+${n} FEET HIRED` : "+1 FOOT HIRED";
-  if (kind === "ghost") return n > 1 ? `+${n} GHOST HANDS` : "+1 GHOST HAND";
-  if (kind === "stickman") return n > 1 ? `+${n} STICKMEN` : "+1 STICKMAN";
+  if (isHelperId(kind)) {
+    const helper = helperDefinition(kind);
+    return `+${n} ${n > 1 ? helper.hiredMany : helper.hiredOne}`;
+  }
   if (kind === "filament") return `+${n} ${gasById(gid!).name} ${s("ARC")}`;
   if (kind === "voltage") return `+${n} ${s("VOLT STEP")}`;
   return `+${n} ${s("BRANCH")}`;
