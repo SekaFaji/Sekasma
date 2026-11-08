@@ -729,7 +729,8 @@ test("HELP tab renders each existing helper from the catalog with current lock r
   const html = renderToStaticMarkup(React.createElement(UpgradePanel, props));
   assert.equal(HELPER_CATALOG.length, 4);
   for (const helper of HELPER_CATALOG) assert.match(html, new RegExp(helper.name));
-  assert.equal((html.match(/UNLOCKS WITH /g) ?? []).length, 3);
+  // Each locked helper appears once in visible text and once in its accessible title.
+  assert.equal((html.match(/UNLOCKS WITH /g) ?? []).length, 6);
   assert.match(html, /POWER 1 · OWN 0\/30/);
   assert.match(html, /UNLOCKS WITH ARGON GAS/);
   assert.match(html, /UNLOCKS WITH XENON GAS/);
