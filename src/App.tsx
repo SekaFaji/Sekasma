@@ -267,6 +267,7 @@ export default function App() {
           <PlasmaBall
             filaments={state.filaments}
             splits={state.splits}
+            voltage={state.voltage}
             unlocked={unlockedGases}
             fingers={state.fingers}
             toes={state.toes}
