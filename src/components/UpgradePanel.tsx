@@ -263,7 +263,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                           name={`${g.name} VOLTS`}
                           sub={`+10% BASE · LV ${steps}/${MAX_VOLT_LEVELS} · X${voltMult(steps, state.legacyVoltage[g.id]).toFixed(2)}` +
                             (state.legacyVoltage[g.id] ? ` · OLD X${legacyVoltMult(state.legacyVoltage[g.id]).toFixed(2)}` : "") +
-                            (voltBuy.count > 1 ? ` · +${voltBuy.count} STEPS` : "")}
+                            (voltBuy.count > 1 ? ` · +${voltBuy.count} LEVELS` : "")}
                           cost={voltBuy.cost}
                           icon={<PixelIcon sprite={VOLT_ICON} color={g.color} px={3} />}
                           onBuy={() => buy("voltage", g.id, selected("voltage", g.id))}
