@@ -4,7 +4,7 @@ import UpgradeRow, { type BuyQuantity } from "./UpgradeRow";
 import InfoRow from "./InfoRow";
 import PixelIcon from "./PixelIcon";
 import { nextGas } from "../game/gases";
-import { SPLIT_CAP, HELPER_POWER, MAX_VOLT_LEVELS, legacyVoltMult, splitMult, voltMult } from "../game/config";
+import { SPLIT_CAP, MAX_VOLT_LEVELS, legacyVoltMult, splitMult, voltMult } from "../game/config";
 import { MAX_BULK_PURCHASE, bulkCost, canAfford, cracklePower, peekCost } from "../game/economy";
 import { previewPurchaseImpact } from "../game/purchasePreview";
 import type { BuyKind } from "../game/economy";
