@@ -1,15 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { accrueIdle, accrueOffline, bulkCost, cappedOfflineSeconds, fingerCost, purchaseUpgrade } from "../src/game/economy.ts";
-import { OFFLINE_CAP_S, HELPER_POWER, PRESS_INTERVAL } from "../src/game/config.ts";
-import { BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
+import { OFFLINE_CAP_S, HELPER_POWER, PRESS_INTERVAL, MAX_VOLT_LEVELS, VOLT_LEVEL_BONUS, voltMult } from "../src/game/config.ts";
+import { BACKUP_KEY, PRE_VOLTAGE_BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
 import { measureTick } from "../src/game/timing.ts";
 import { visibleHelperCount, visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../src/render/limits.ts";
 import { advanceStickman, createStickman } from "../src/render/stickmen.ts";
 import { PX, CX, CY, R } from "../src/render/geometry.ts";
 import { plasmaDisplacement } from "../src/render/plasma.ts";
 import { previewPurchaseImpact } from "../src/game/purchasePreview.ts";
-import { idleRate, MAX_BULK_PURCHASE } from "../src/game/economy.ts";
+import { idleRate, MAX_BULK_PURCHASE, cracklePower, voltageCost } from "../src/game/economy.ts";
 import { BASE_CAPACITY, CAPACITY_STEP, capacityUpgradeCost, helperCapacity, helperRoom, performPrestige, prestigeReward, runPrestigeScore, upgradeCapacity } from "../src/game/prestige.ts";
 
 test("offline settlement is capped and handles negative time", () => {
@@ -75,7 +75,8 @@ test("legacy save validation prevents invalid currencies and progression", () =>
   assert.equal(state.plasma.neon, 0);
   assert.equal(state.plasma.argon, 0);
   assert.equal(state.plasma.xenon, 3);
-  assert.equal(state.voltage.neon, 99999);
+  assert.equal(state.voltage.neon, 0);
+  assert.equal(state.legacyVoltage.neon, 99999);
   assert.equal(state.filaments.neon, 12);
   assert.equal(state.splits.neon, 8);
   assert.equal(state.activeSeconds, 0);
@@ -464,11 +465,11 @@ test("purchase preview accurately projects helper rates without changing state",
   assert.equal(previewPurchaseImpact(s, "finger", undefined, 0), null);
 });
 
-test("Arc Split and tiny Volt improvements remain visible in projected tap rates", () => {
+test("Arc Split and ten-percent Voltage improvements remain visible in projected tap rates", () => {
   const s = freshSave();
   assert.match(previewPurchaseImpact(s, "filament", "neon", 1).preview, /NEON\/T 0.1 → 0.2/);
   assert.match(previewPurchaseImpact(s, "split", "neon", 1).preview, /NEON\/T 0.1 → 0.15/);
-  assert.match(previewPurchaseImpact(s, "voltage", "neon", 1).preview, /0.1 → 0.10001/);
+  assert.match(previewPurchaseImpact(s, "voltage", "neon", 1).preview, /0.1 → 0.11/);
   assert.equal(MAX_BULK_PURCHASE, 1000);
 });
 
@@ -549,20 +550,22 @@ test("v15 migration preserves observed counters but cannot invent prior reset to
   assert.equal(restored.lifetime.helperHires.toe, 2);
   assert.equal(restored.lifetime.purchasedArcs.neon, 3);
   assert.equal(restored.lifetime.purchasedSplits.neon, 1);
-  assert.equal(restored.lifetime.purchasedVoltage.neon, 14);
+  assert.equal(restored.lifetime.purchasedVoltage.neon, 0);
+  assert.equal(restored.lifetime.legacyVoltagePurchases.neon, 14);
+  assert.equal(restored.legacyVoltage.neon, 14);
   assert.equal(restored.lifetime.runStartCrackles, 678);
   assert.equal(restored.lifetime.runStartActiveSeconds, 234);
   assert.equal(restored.total.neon, 45678);
   assert.ok(restored.lifetime.peakTapPower.neon > 0.1);
 });
 
-test("v16 lifetime history survives real save and reload without resetting save keys", () => withStorage((items) => {
+test("v17 lifetime history survives real save and reload without resetting save keys", () => withStorage((items) => {
   let s = freshSave();
   s.plasma.neon = 100;
   s = purchaseUpgrade(s, "finger", undefined, 2).state;
   assert.equal(persist(s), true);
   const stored = JSON.parse(items.get(SAVE_KEY));
-  assert.equal(stored.v, 16);
+  assert.equal(stored.v, 17);
   assert.equal(loadSave().lifetime.helperHires.finger, 2);
   assert.equal(loadSave().fingers, 2);
   assert.equal(loadSave().lifetime.peakHelpRate.neon, s.lifetime.peakHelpRate.neon);
