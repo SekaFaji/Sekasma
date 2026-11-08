@@ -1,4 +1,5 @@
 import { cracklePower } from "../game/economy";
+import { HELPER_CATALOG, helperOwned } from "../game/helpers";
 import { MAX_VOLT_LEVELS, splitMult, voltMult } from "../game/config";
 import type { Gas, GasRecord, GameState } from "../game/types";
 import { fmt } from "../utils/format";
@@ -45,10 +46,12 @@ export default function StatsPanel({ state, unlockedGases, rates }: {
             lifetime={formatDuration(state.activeSeconds)} />
           <StatCard title="OFFLINE PLAYTIME" value={formatDuration(offlineThisRun)}
             lifetime={formatDuration(state.offlineSeconds)} />
-          <StatCard title="FINGERS HIRED" value={String(state.fingers)} lifetime={String(ls.helperHires.finger)} />
-          <StatCard title="BIG TOES" value={String(state.toes)} lifetime={String(ls.helperHires.toe)} />
-          <StatCard title="GHOST HANDS" value={String(state.ghosts)} lifetime={String(ls.helperHires.ghost)} />
-          <StatCard title="STICKMEN" value={String(state.stickmen)} lifetime={String(ls.helperHires.stickman)} note="KRYPTON HELPER" />
+          {HELPER_CATALOG.map(helper => (
+            <StatCard key={helper.id} title={helper.statsLabel}
+              value={String(helperOwned(state, helper.id))}
+              lifetime={String(ls.helperHires[helper.id])}
+              note={helper.id === "stickman" ? "KRYPTON HELPER" : undefined} />
+          ))}
         </div>
       </section>
       {unlockedGases.map(gas => {
