@@ -4,7 +4,7 @@
  * Handles multi-touch input (max two player fingers) and forwards crackles.
  */
 import React, { useEffect, useRef } from "react";
-import { HOLD_INTERVAL, PRESS_INTERVAL } from "../game/config";
+import { HOLD_INTERVAL, PRESS_INTERVAL, SPLIT_CAP } from "../game/config";
 import { fmtShort } from "../utils/format";
 import { haptic } from "../utils/haptic";
 import { PX, CX, CY, R } from "../render/geometry";
@@ -28,10 +28,11 @@ import type { Ripple, FloatText, Flash, HoldArc, Wanderer } from "../render/plas
 import type { Gas, GasRecord } from "../game/types";
 
 export default function PlasmaBall({
-  filaments, splits, unlocked, fingers, toes, ghosts, stickmen, crackles, neonPow, onCrackle, buzzOn,
+  filaments, splits, voltage, unlocked, fingers, toes, ghosts, stickmen, crackles, neonPow, onCrackle, buzzOn,
 }: {
   filaments: GasRecord;
   splits: GasRecord;
+  voltage: GasRecord;
   unlocked: Gas[];
   fingers: number;
   toes: number;
@@ -52,8 +53,8 @@ export default function PlasmaBall({
   const fingerSeeds = useRef<Wanderer[]>([]);
   const toeSeeds = useRef<Wanderer[]>([]);
   const stickAgents = useRef<StickmanMotion[]>([]);
-  const propsRef = useRef({ filaments, splits, unlocked, fingers, toes, ghosts, stickmen, crackles });
-  propsRef.current = { filaments, splits, unlocked, fingers, toes, ghosts, stickmen, crackles };
+  const propsRef = useRef({ filaments, splits, voltage, unlocked, fingers, toes, ghosts, stickmen, crackles });
+  propsRef.current = { filaments, splits, voltage, unlocked, fingers, toes, ghosts, stickmen, crackles };
   const neonPowRef = useRef(neonPow);
   neonPowRef.current = neonPow;
   const buzzRef = useRef(buzzOn);
@@ -460,7 +461,7 @@ export default function PlasmaBall({
       // ---- your fingers: ONE string each + wandering streams from ARCS ----
       if (held) {
         const totalFil = u.reduce((sum, g) => sum + fil[g.id], 0);
-        const roamsPer = Math.min(totalFil, 15); // ARC upgrades = more strings
+        const roamsPer = Math.min(totalFil, 30); // all 30 purchasable Arcs can produce strings
         const per = 1 + roamsPer;
         const want = Math.min(per * pts.length, 64);
         const activeIds = pts.map(([id]) => id);
@@ -492,10 +493,12 @@ export default function PlasmaBall({
             tx = CX + Math.cos(ra) * a.reach;
             ty = CY + Math.sin(ra) * a.reach;
           }
-          drawPlasmaArc(ctx, CX, CY, tx, ty, a.gas, t, a.phase, a.kind === "leader" ? 2.2 : 3.4, 1.4);
+          // Voltage increases arc liveliness slightly without adding draw calls.
+          const voltEnergy = Math.min(0.85, (propsRef.current.voltage[a.gas.id] ?? 0) * 0.035);
+          drawPlasmaArc(ctx, CX, CY, tx, ty, a.gas, t, a.phase, (a.kind === "leader" ? 2.2 : 3.4) + voltEnergy, 1.4);
           // SPLIT upgrade: your one string forks, real-plasma-ball style
           if (a.kind === "leader") {
-            const br = Math.min(propsRef.current.splits[a.gas.id] ?? 0, 6);
+            const br = Math.min(propsRef.current.splits[a.gas.id] ?? 0, SPLIT_CAP);
             if (br > 0) {
               const mx = (CX + tx) / 2;
               const my = (CY + ty) / 2;

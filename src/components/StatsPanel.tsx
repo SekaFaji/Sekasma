@@ -1,5 +1,5 @@
 import { cracklePower } from "../game/economy";
-import { fmtVolts, splitMult } from "../game/config";
+import { MAX_VOLT_LEVELS, splitMult, voltMult } from "../game/config";
 import type { Gas, GasRecord, GameState } from "../game/types";
 import { fmt } from "../utils/format";
 import { formatDuration } from "../utils/time";
@@ -72,9 +72,9 @@ export default function StatsPanel({ state, unlockedGases, rates }: {
               <StatCard title="SPLITS" value={String(state.splits[id])}
                 lifetime={String(ls.purchasedSplits[id])}
                 note={`X${splitMult(state.splits[id]).toFixed(2)} MULT`} />
-              <StatCard title="VOLT STEPS" value={String(state.voltage[id])}
+              <StatCard title="VOLTAGE" value={`${state.voltage[id]}/${MAX_VOLT_LEVELS}`}
                 lifetime={String(ls.purchasedVoltage[id])}
-                note={fmtVolts(state.voltage[id])} />
+                note={`X${voltMult(state.voltage[id], state.legacyVoltage[id]).toFixed(2)} · OLD ${ls.legacyVoltagePurchases[id]} STEPS`} />
             </div>
           </section>
         );

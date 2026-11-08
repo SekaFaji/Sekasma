@@ -6,7 +6,8 @@ import { GAS_LIST, gasById, nextGas } from "./gases.ts";
 import {
   FIL_BASE,
   HELPER_POWER,
-  MAX_VOLT_STEPS,
+  MAX_VOLT_LEVELS,
+  VOLT_COST_GROWTH,
   MIX_LV,
   PRESS_INTERVAL,
   OFFLINE_CAP_S,
@@ -54,12 +55,12 @@ export const filamentCost = (g: GasId, n: number): Partial<GasRecord> => ({
   [g]: Math.ceil(FIL_BASE[g] * Math.pow(1.55, n)),
 } as Partial<GasRecord>);
 export const voltageCost = (g: GasId, v: number): Partial<GasRecord> => ({
-  [g]: Math.ceil(VOLT_BASE[g] * Math.pow(1.07, v)),
+  [g]: Math.ceil(VOLT_BASE[g] * Math.pow(VOLT_COST_GROWTH, v)),
 } as Partial<GasRecord>);
 
 // per-gas crackle power = baseRate x (1 + arcs) x (1 + volts) x splits
 export const cracklePower = (g: Gas, s: GameState) =>
-  g.baseRate * (1 + s.filaments[g.id]) * voltMult(s.voltage[g.id]) * splitMult(s.splits[g.id]);
+  g.baseRate * (1 + s.filaments[g.id]) * voltMult(s.voltage[g.id], s.legacyVoltage[g.id]) * splitMult(s.splits[g.id]);
 
 // idle income per gas = hired help pressing around the clock
 export const idleRate = (s: GameState): GasRecord => {
@@ -109,7 +110,7 @@ export const bulkCost = (
     if (kind === "filament" && gid)
       c = s.filaments[gid] + n >= gasById(gid).cap ? null : filamentCost(gid, s.filaments[gid] + n);
     if (kind === "voltage" && gid)
-      c = s.voltage[gid] + n >= MAX_VOLT_STEPS ? null : voltageCost(gid, s.voltage[gid] + n);
+      c = s.voltage[gid] + n >= MAX_VOLT_LEVELS ? null : voltageCost(gid, s.voltage[gid] + n);
     if (kind === "split" && gid)
       c = s.splits[gid] + n >= SPLIT_CAP ? null : splitCost(gid, s.splits[gid] + n);
     if (kind === "gas")
@@ -132,7 +133,7 @@ export function peekCost(s: GameState, kind: BuyKind, gid?: GasId): Partial<GasR
   if (kind === "filament" && gid)
     return s.filaments[gid] >= gasById(gid).cap ? {} : filamentCost(gid, s.filaments[gid]);
   if (kind === "voltage" && gid)
-    return s.voltage[gid] >= MAX_VOLT_STEPS ? {} : voltageCost(gid, s.voltage[gid]);
+    return s.voltage[gid] >= MAX_VOLT_LEVELS ? {} : voltageCost(gid, s.voltage[gid]);
   if (kind === "split" && gid)
     return s.splits[gid] >= SPLIT_CAP ? {} : splitCost(gid, s.splits[gid]);
   if (kind === "gas") return nextGas(s.unlocked)?.unlockCost ?? {};

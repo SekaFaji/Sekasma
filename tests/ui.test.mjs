@@ -680,3 +680,39 @@ test("Stats retain small lifetime values even when Prestige cleared run helpers 
   assert.match(markup, /aria-label="POWER \/ TAP lifetime 2.5"/);
   assert.match(markup, /Older reset history cannot be reconstructed/);
 });
+
+test("Voltage upgrade rows show ten-percent levels and retained legacy multipliers", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const state = freshSave();
+  state.voltage.neon = 1;
+  state.legacyVoltage.neon = 1000;
+  state.plasma.neon = 200;
+  const props = { state, unlockedGases: [gasById("neon")], accent: "#f582aa", upTab: "power",
+    onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {} };
+  const html = renderToStaticMarkup(React.createElement(UpgradePanel, props));
+  assert.match(html, /NEON VOLTS/);
+  assert.match(html, /\+10% BASE/);
+  assert.match(html, /LV 1\/20/);
+  assert.match(html, /X1.21/);
+  assert.match(html, /OLD X1.10/);
+  assert.doesNotMatch(html, /\+0\.0001V/);
+});
+
+test("Voltage Stats show current levels and separate old-step lifetime history", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const state = freshSave();
+  state.voltage.neon = 2;
+  state.legacyVoltage.neon = 1000;
+  state.lifetime.purchasedVoltage.neon = 2;
+  state.lifetime.legacyVoltagePurchases.neon = 1500;
+  const html = renderToStaticMarkup(React.createElement(StatsPanel, {
+    state, unlockedGases: [gasById("neon")], rates: plasma(0),
+  }));
+  assert.match(html, /VOLTAGE/);
+  assert.match(html, /2\/20/);
+  assert.match(html, /VOLTAGE lifetime 2/);
+  assert.match(html, /X1.32/);
+  assert.match(html, /OLD 1500 STEPS/);
+});

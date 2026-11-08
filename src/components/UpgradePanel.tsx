@@ -4,7 +4,7 @@ import UpgradeRow, { type BuyQuantity } from "./UpgradeRow";
 import InfoRow from "./InfoRow";
 import PixelIcon from "./PixelIcon";
 import { nextGas } from "../game/gases";
-import { SPLIT_CAP, HELPER_POWER, fmtVolts, splitMult, voltMult } from "../game/config";
+import { SPLIT_CAP, HELPER_POWER, MAX_VOLT_LEVELS, legacyVoltMult, splitMult, voltMult } from "../game/config";
 import { MAX_BULK_PURCHASE, bulkCost, canAfford, cracklePower, peekCost } from "../game/economy";
 import { previewPurchaseImpact } from "../game/purchasePreview";
 import type { BuyKind } from "../game/economy";
@@ -261,8 +261,9 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                         />
                         <UpgradeRow
                           name={`${g.name} VOLTS`}
-                          sub={`+0.0001V · ${fmtVolts(steps)} · X${voltMult(steps).toFixed(4)}` +
-                            (voltBuy.count > 1 ? ` · +${voltBuy.count} STEPS` : "")}
+                          sub={`+10% BASE · LV ${steps}/${MAX_VOLT_LEVELS} · X${voltMult(steps, state.legacyVoltage[g.id]).toFixed(2)}` +
+                            (state.legacyVoltage[g.id] ? ` · OLD X${legacyVoltMult(state.legacyVoltage[g.id]).toFixed(2)}` : "") +
+                            (voltBuy.count > 1 ? ` · +${voltBuy.count} LEVELS` : "")}
                           cost={voltBuy.cost}
                           icon={<PixelIcon sprite={VOLT_ICON} color={g.color} px={3} />}
                           onBuy={() => buy("voltage", g.id, selected("voltage", g.id))}
