@@ -3,18 +3,20 @@
  * from every legacy save format, and player options.
  */
 import { GAS_LIST } from "./gases.ts";
-import { MAX_VOLT_STEPS, SPLIT_CAP, VOLT_STEP, zero3 } from "./config.ts";
+import { MAX_VOLT_LEVELS, MAX_VOLT_STEPS, SPLIT_CAP, VOLT_STEP, zero3 } from "./config.ts";
 import type { GasId, GameState, HelperId, HelperRecord, LifetimeStats, PrestigeProgress } from "./types.ts";
 import { cracklePower, idleRate } from "./economy.ts";
 import { BASE_CAPACITY, HELPERS, freshPrestige } from "./prestige.ts";
 
 export const SAVE_KEY = "idle-plasma-ball-save-v10";
-// Keep existing save keys stable for old installs. The internal schema is v16.
+// Keep existing save keys stable for old installs. The internal schema is v17.
 export const BACKUP_KEY = "idle-plasma-ball-save-backup-v12";
 export const LEGACY_V9_KEY = "idle-plasma-ball-save-v9";
 export const LEGACY_V8_KEY = "idle-plasma-ball-save-v8";
 export const LEGACY_V6_KEY = "idle-plasma-ball-save-v6";
 export const OPTS_KEY = "idle-plasma-ball-opts-v1";
+/** One-time read-only snapshot before the old Voltage economy is converted. */
+export const PRE_VOLTAGE_BACKUP_KEY = "idle-plasma-ball-before-voltage-v17";
 
 export function loadOpts(): { scan: boolean; buzz: boolean } {
   try {
@@ -35,6 +37,7 @@ export function freshLifetime(): LifetimeStats {
     purchasedArcs: zero3(),
     purchasedSplits: zero3(),
     purchasedVoltage: zero3(),
+    legacyVoltagePurchases: zero3(),
     peakHelpRate: zero3(),
     peakTapPower: { ...zero3(), neon: GAS_LIST[0].baseRate },
     runStartCrackles: 0, runStartActiveSeconds: 0, runStartOfflineSeconds: 0,
@@ -45,7 +48,7 @@ export function freshSave(): GameState {
   const now = Date.now();
   return {
     plasma: zero3(), total: zero3(), crackles: 0,
-    voltage: zero3(), fingers: 0, toes: 0, ghosts: 0, stickmen: 0,
+    voltage: zero3(), legacyVoltage: zero3(), fingers: 0, toes: 0, ghosts: 0, stickmen: 0,
     filaments: zero3(), splits: zero3(), unlocked: ["neon"],
     created: now, lastSeen: now, activeSeconds: 0, offlineSeconds: 0,
     prestige: freshPrestige(),
@@ -59,7 +62,7 @@ function validNumber(value: unknown, fallback = 0, maximum = Number.MAX_SAFE_INT
   return typeof value === "number" && Number.isFinite(value) && value >= 0
     ? Math.min(value, maximum) : fallback;
 }
-function sanitizeSave(s: GameState): GameState {
+function sanitizeSave(s: GameState, fromOldVoltage = false): GameState {
   const fallback = freshSave();
   const record = (value: unknown, max = Number.MAX_SAFE_INTEGER) => {
     const object = value && typeof value === "object" && !Array.isArray(value)
@@ -74,11 +77,15 @@ function sanitizeSave(s: GameState): GameState {
   if (rawUnlocks.includes("argon") && rawUnlocks.includes("xenon")) unlocked.push("xenon");
   if (unlocked.includes("xenon") && rawUnlocks.includes("krypton")) unlocked.push("krypton");
   const filaments = record(s.filaments);
-  const voltage = record(s.voltage, MAX_VOLT_STEPS);
+  // Convert micro-volt STEPS into a separate legacy run-only contribution.
+  // Never reinterpret them as 10% levels or erase their current multiplier.
+  const legacyVoltage = record(fromOldVoltage ? s.voltage : s.legacyVoltage, MAX_VOLT_STEPS);
+  const voltage = fromOldVoltage ? zero3() : record(s.voltage, MAX_VOLT_LEVELS);
   const splits = record(s.splits, SPLIT_CAP);
   for (const g of GAS_LIST) {
     filaments[g.id] = Math.floor(Math.min(g.cap, filaments[g.id]));
     voltage[g.id] = Math.floor(voltage[g.id]);
+    legacyVoltage[g.id] = Math.floor(legacyVoltage[g.id]);
     splits[g.id] = Math.floor(splits[g.id]);
   }
   const rawPrestige: Partial<PrestigeProgress> = s.prestige && typeof s.prestige === "object"
@@ -112,7 +119,11 @@ function sanitizeSave(s: GameState): GameState {
   });
   const purchasedArcs = record(prior.purchasedArcs ?? filaments);
   const purchasedSplits = record(prior.purchasedSplits ?? splits);
-  const purchasedVoltage = record(prior.purchasedVoltage ?? voltage);
+  const purchasedVoltage = record(fromOldVoltage ? undefined : (prior.purchasedVoltage ?? voltage));
+  // Legacy lifetime totals are kept verbatim, not rebadged as new levels.
+  const legacyVoltagePurchases = record(fromOldVoltage
+    ? prior.purchasedVoltage ?? legacyVoltage
+    : prior.legacyVoltagePurchases);
   const peakHelpRate = record(prior.peakHelpRate);
   const peakTapPower = record(prior.peakTapPower ?? baseline.peakTapPower);
   // Old saves lack per-run counter snapshots. Do not invent purchases made
@@ -121,7 +132,7 @@ function sanitizeSave(s: GameState): GameState {
   const legacyOffset = (value: unknown, current: number): number =>
     Math.min(current, validNumber(value, oldRun ? current : 0));
   const lifetime: LifetimeStats = {
-    helperHires, purchasedArcs, purchasedSplits, purchasedVoltage,
+    helperHires, purchasedArcs, purchasedSplits, purchasedVoltage, legacyVoltagePurchases,
     peakHelpRate, peakTapPower,
     runStartCrackles: legacyOffset(prior.runStartCrackles, Math.floor(validNumber(s.crackles))),
     runStartActiveSeconds: legacyOffset(prior.runStartActiveSeconds, validNumber(s.activeSeconds)),
@@ -138,7 +149,7 @@ function sanitizeSave(s: GameState): GameState {
   const normalized: GameState = {
     plasma: record(s.plasma), total: record(s.total),
     crackles: Math.floor(validNumber(s.crackles)),
-    voltage, filaments, splits, unlocked,
+    voltage, legacyVoltage, filaments, splits, unlocked,
     fingers: Math.floor(validNumber(s.fingers)),
     toes: Math.floor(validNumber(s.toes)),
     ghosts: Math.floor(validNumber(s.ghosts)),
@@ -157,6 +168,7 @@ function sanitizeSave(s: GameState): GameState {
     lifetime.purchasedArcs[id] = Math.max(lifetime.purchasedArcs[id], filaments[id]);
     lifetime.purchasedSplits[id] = Math.max(lifetime.purchasedSplits[id], splits[id]);
     lifetime.purchasedVoltage[id] = Math.max(lifetime.purchasedVoltage[id], voltage[id]);
+    lifetime.legacyVoltagePurchases[id] = Math.max(lifetime.legacyVoltagePurchases[id], legacyVoltage[id]);
     lifetime.peakHelpRate[id] = Math.max(lifetime.peakHelpRate[id], nowRates[id]);
     if (unlocked.includes(id))
       lifetime.peakTapPower[id] = Math.max(lifetime.peakTapPower[id], cracklePower(gas, normalized));
@@ -169,11 +181,11 @@ function sanitizeSave(s: GameState): GameState {
   return normalized;
 }
 
-// migrate older saves into the micro-volt economy
+// Migrate old micro-voltage saves into the new level system without changing power.
 export function migrateSave(old: Record<string, unknown>): GameState {
   const base = freshSave();
-  // v10 / v9 saves: load as-is (v9 predates splits)
-  if (old.v === 16 || old.v === 15 || old.v === 14 || old.v === 13 || old.v === 12 || old.v === 11 || old.v === 10 || old.v === 9) {
+  // v17 already uses levels; all earlier versions use micro-volt steps.
+  if (old.v === 17 || old.v === 16 || old.v === 15 || old.v === 14 || old.v === 13 || old.v === 12 || old.v === 11 || old.v === 10 || old.v === 9) {
     const s = { ...base, ...(old as unknown as GameState) };
     // Old snapshots never had lifetime counters. Distinguish "not recorded"
     // from fresh zeroes so older Prestiges are not counted as this run.
@@ -182,7 +194,7 @@ export function migrateSave(old: Record<string, unknown>): GameState {
     if (!s.splits) s.splits = zero3();
     if (typeof s.ghosts !== "number") s.ghosts = 0;
     if (typeof s.stickmen !== "number") s.stickmen = 0;
-    return sanitizeSave(s);
+    return sanitizeSave(s, old.v !== 17);
   }
   // v6 save: single currency, volts were x2 levels
   if (typeof old.plasma === "number") {
@@ -201,7 +213,7 @@ export function migrateSave(old: Record<string, unknown>): GameState {
       : gas === "argon" ? ["neon", "argon"]
       : ["neon"];
     base.created = (old.created as number) ?? Date.now();
-    return sanitizeSave(base);
+    return sanitizeSave(base, true);
   }
   // v8 save: gas currencies, volts were x2 levels → convert to steps
   const src = old as Record<string, Record<string, number> | number | GasId[] | undefined>;
@@ -222,7 +234,7 @@ export function migrateSave(old: Record<string, unknown>): GameState {
     const unl = src.unlocked as GasId[] | undefined;
     base.unlocked = Array.isArray(unl) && unl.length ? unl : ["neon"];
     base.created = (src.created as number) ?? Date.now();
-    return sanitizeSave(base);
+    return sanitizeSave(base, true);
   }
   return base;
 }
@@ -237,6 +249,12 @@ export function loadSave(): GameState | null {
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) continue;
       const candidate = parsed as Record<string, unknown>;
       if (typeof candidate.fingers !== "number" || !Number.isFinite(candidate.fingers)) continue;
+      // Preserve the exact pre-migration snapshot in a separate storage slot.
+      // Normal autosaves rotate BACKUP_KEY; this one never gets overwritten.
+      if (candidate.v !== 17 && !window.localStorage.getItem(PRE_VOLTAGE_BACKUP_KEY)) {
+        try { window.localStorage.setItem(PRE_VOLTAGE_BACKUP_KEY, raw); }
+        catch { /* Limited storage; the in-memory migration still proceeds. */ }
+      }
       return migrateSave(candidate);
     } catch {
       // A single bad slot must not hide other usable snapshots.
@@ -261,7 +279,7 @@ export function persist(s: GameState): boolean {
         // Leave the existing backup untouched.
       }
     }
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 16 }));
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 17 }));
     return true;
   } catch {
     // No storage (e.g. private browsing): retain the in-memory session.
@@ -273,7 +291,7 @@ export function persist(s: GameState): boolean {
 export function resetSave(): GameState {
   const fresh = freshSave();
   try {
-    for (const key of [SAVE_KEY, BACKUP_KEY, LEGACY_V9_KEY, LEGACY_V8_KEY, LEGACY_V6_KEY]) {
+    for (const key of [SAVE_KEY, BACKUP_KEY, LEGACY_V9_KEY, LEGACY_V8_KEY, LEGACY_V6_KEY, PRE_VOLTAGE_BACKUP_KEY]) {
       window.localStorage.removeItem(key);
     }
   } catch {
