@@ -21,6 +21,8 @@ export type HelperDefinition = {
   id: HelperId;
   name: string;
   statsLabel: string;
+  hiredOne: string;
+  hiredMany: string;
   nativeGas: GasId;
   saveField: HelperSaveField;
   visual: HelperVisual;
@@ -41,6 +43,7 @@ export type HelperDefinition = {
 export const HELPER_CATALOG: readonly HelperDefinition[] = [
   {
     id: "finger", name: "FINGER", statsLabel: "FINGERS HIRED",
+    hiredOne: "FINGER HIRED", hiredMany: "FINGERS HIRED",
     nativeGas: "neon", saveField: "fingers", visual: "finger",
     power: HELPER_POWER.finger, baseCapacity: 30, capacityStep: 10,
     iconPixelScale: 2, firstPurchasePrice: 2,
@@ -53,6 +56,7 @@ export const HELPER_CATALOG: readonly HelperDefinition[] = [
   },
   {
     id: "toe", name: "BIG TOE", statsLabel: "BIG TOES",
+    hiredOne: "FOOT HIRED", hiredMany: "FEET HIRED",
     nativeGas: "argon", saveField: "toes", visual: "toe",
     power: HELPER_POWER.toe, baseCapacity: 25, capacityStep: 5,
     shopColor: "#dfa07d", iconPixelScale: 3,
@@ -65,6 +69,7 @@ export const HELPER_CATALOG: readonly HelperDefinition[] = [
   },
   {
     id: "ghost", name: "GHOST HAND", statsLabel: "GHOST HANDS",
+    hiredOne: "GHOST HAND", hiredMany: "GHOST HANDS",
     nativeGas: "xenon", saveField: "ghosts", visual: "ghost",
     power: HELPER_POWER.ghost, baseCapacity: 20, capacityStep: 5,
     shopColor: "#b7b2ff", iconPixelScale: 3,
@@ -72,6 +77,7 @@ export const HELPER_CATALOG: readonly HelperDefinition[] = [
   },
   {
     id: "stickman", name: "STICKMAN", statsLabel: "STICKMEN",
+    hiredOne: "STICKMAN", hiredMany: "STICKMEN",
     nativeGas: "krypton", saveField: "stickmen", visual: "stickman",
     power: HELPER_POWER.stickman, baseCapacity: 15, capacityStep: 3,
     shopColor: "#ffd166", iconPixelScale: 3,
