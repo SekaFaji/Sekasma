@@ -670,3 +670,89 @@ test("new Voltage levels visibly improve tap rate previews and migrate legacy mo
   const old = migrateSave({ ...base, voltage: { ...base.voltage, neon: 1000 }, v: 16 });
   assert.match(previewPurchaseImpact(old, "voltage", "neon", 1).preview, /0.11 → 0.121/);
 });
+
+test("helper catalog preserves v0.12.26 prices at early and mixed-currency thresholds", async () => {
+  const { HELPER_CATALOG, HELPER_IDS, helperCost, helperDefinition, helperOwned,
+    helperUnlocked, isHelperId } = await import("../src/game/helpers.ts");
+  const { fingerCost, toeCost, ghostCost, stickmanCost, buyMsg } = await import("../src/game/economy.ts");
+  const { GAS_LIST } = await import("../src/game/gases.ts");
+  assert.deepEqual(HELPER_IDS, ["finger", "toe", "ghost", "stickman"]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.nativeGas), GAS_LIST.map(g => g.id));
+  const gasSets = [
+    ["neon"],
+    ["neon", "argon"],
+    ["neon", "argon", "xenon"],
+    ["neon", "argon", "xenon", "krypton"],
+  ];
+  for (const unlocked of gasSets) {
+    for (const n of [0, 1, 2, 11, 12, 24, 25, 39, 40, 49]) {
+      const finger = { neon: n === 0 ? 2 : Math.ceil(5 * 1.18 ** n) };
+      if (n >= 12 && unlocked.includes("argon")) finger.argon = Math.ceil(3 * 1.15 ** n);
+      if (n >= 25 && unlocked.includes("xenon")) finger.xenon = Math.ceil(2 * 1.12 ** n);
+      if (n >= 40 && unlocked.includes("krypton")) finger.krypton = Math.ceil(1.10 ** n);
+      const toe = { argon: Math.ceil(15 * 1.3 ** n) };
+      if (n >= 12) toe.neon = Math.ceil(8 * 1.15 ** n);
+      if (n >= 25 && unlocked.includes("xenon")) toe.xenon = Math.ceil(4 * 1.12 ** n);
+      if (n >= 40 && unlocked.includes("krypton")) toe.krypton = Math.ceil(2 * 1.10 ** n);
+      assert.deepEqual(fingerCost(n, unlocked), finger);
+      assert.deepEqual(helperCost("finger", n, unlocked), finger);
+      assert.deepEqual(toeCost(n, unlocked), toe);
+      assert.deepEqual(helperCost("toe", n, unlocked), toe);
+      assert.deepEqual(ghostCost(n), { xenon: Math.ceil(80 * 1.45 ** n) });
+      assert.deepEqual(stickmanCost(n), { krypton: Math.ceil(120 * 1.5 ** n) });
+    }
+  }
+  assert.deepEqual(HELPER_CATALOG.map(h => h.power), [1, 8, 20, 45]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.baseCapacity), [30, 25, 20, 15]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.capacityStep), [10, 5, 5, 3]);
+  assert.deepEqual([1, 2].map(n => buyMsg("finger", undefined, n)),
+    ["+1 FINGER HIRED", "+2 FINGERS HIRED"]);
+  assert.deepEqual([1, 2].map(n => buyMsg("toe", undefined, n)),
+    ["+1 FOOT HIRED", "+2 FEET HIRED"]);
+  assert.deepEqual([1, 2].map(n => buyMsg("ghost", undefined, n)),
+    ["+1 GHOST HAND", "+2 GHOST HANDS"]);
+  assert.deepEqual([1, 2].map(n => buyMsg("stickman", undefined, n)),
+    ["+1 STICKMAN", "+2 STICKMEN"]);
+  assert.equal(isHelperId("finger"), true);
+  assert.equal(isHelperId("voltage"), false);
+  const fresh = freshSave();
+  assert.equal(helperOwned(fresh, "finger"), fresh.fingers);
+  assert.equal(helperUnlocked(fresh, "toe"), false);
+  assert.equal(helperUnlocked({ ...fresh, unlocked: ["neon", "argon"] }, "toe"), true);
+  assert.equal(helperDefinition("toe").statsLabel, "BIG TOES");
+});
+
+test("catalog purchase and Prestige retain exact save fields, balances and lifetime history", () => {
+  const saved = freshSave();
+  saved.unlocked = ["neon", "argon", "xenon", "krypton"];
+  saved.plasma = { neon: 5e10, argon: 5e10, xenon: 5e10, krypton: 5e10 };
+  let current = saved;
+  const amounts = [["finger", 5], ["toe", 4], ["ghost", 3], ["stickman", 2]];
+  const fields = ["fingers", "toes", "ghosts", "stickmen"];
+  for (let i = 0; i < amounts.length; i++) {
+    const [kind, count] = amounts[i];
+    const pre = bulkCost(current, kind, undefined, count);
+    assert.equal(pre.count, count);
+    const before = { ...current.plasma };
+    const old = current;
+    const next = purchaseUpgrade(current, kind, undefined, count);
+    assert.equal(next.count, count);
+    assert.equal(next.state[fields[i]], count);
+    assert.equal(next.state.lifetime.helperHires[kind], count);
+    for (const gas of Object.keys(before))
+      assert.equal(next.state.plasma[gas], before[gas] - (pre.cost[gas] ?? 0));
+    assert.equal(JSON.stringify(old), JSON.stringify(current));
+    current = next.state;
+  }
+  const expectedHelp = (5 * 1 + 4 * 8 + 3 * 20 + 2 * 45) * 0.1 / 2.2;
+  assert.ok(Math.abs(idleRate(current).neon - expectedHelp) < 1e-10);
+  assert.equal(helperCapacity(current, "finger"), 30);
+  current.total.krypton = 3000;
+  const reset = performPrestige(current);
+  assert.notStrictEqual(reset, current);
+  for (const field of fields) assert.equal(reset[field], 0);
+  assert.deepEqual(reset.lifetime.helperHires, current.lifetime.helperHires);
+  const reloaded = migrateSave({ ...reset, v: 17 });
+  assert.deepEqual(reloaded.lifetime.helperHires, current.lifetime.helperHires);
+  assert.equal(reloaded.voltage.neon, 0);
+});
