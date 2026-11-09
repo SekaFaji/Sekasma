@@ -1,5 +1,5 @@
 /**
- * Core domain types: the three gas currencies and the save-state shape.
+ * Core domain types: four gas currencies and the versioned save-state shape.
  */
 
 export type GasId = "neon" | "argon" | "xenon" | "krypton";
@@ -15,7 +15,7 @@ export type Gas = {
   unlockCost: Partial<Record<GasId, number>>;
 };
 export type GasRecord = Record<GasId, number>;
-export type HelperId = "finger" | "toe" | "ghost" | "stickman";
+export type HelperId = "finger" | "sparkMite" | "copperSpider" | "toe" | "ghost" | "stickman";
 export type HelperRecord = Record<HelperId, number>;
 /** Non-resetting progress; historic purchases are tracked from v0.12.25 onward. */
 export type LifetimeStats = {
@@ -47,6 +47,8 @@ export type GameState = {
   voltage: GasRecord; // new +10% Voltage levels per gas (0..20)
   legacyVoltage: GasRecord; // grandfathered micro-volt steps, current run only
   fingers: number;
+  sparkMites: number;
+  copperSpiders: number;
   toes: number;
   ghosts: number;
   stickmen: number;
