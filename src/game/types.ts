@@ -15,7 +15,7 @@ export type Gas = {
   unlockCost: Partial<Record<GasId, number>>;
 };
 export type GasRecord = Record<GasId, number>;
-export type HelperId = "finger" | "sparkMite" | "copperSpider" | "toe" | "ghost" | "stickman";
+export type HelperId = "finger" | "sparkMite" | "copperSpider" | "toe" | "conductivePalm" | "orbitDrone" | "ghost" | "stickman";
 export type HelperRecord = Record<HelperId, number>;
 /** Non-resetting progress; historic purchases are tracked from v0.12.25 onward. */
 export type LifetimeStats = {
@@ -50,6 +50,8 @@ export type GameState = {
   sparkMites: number;
   copperSpiders: number;
   toes: number;
+  conductivePalms: number;
+  orbitDrones: number;
   ghosts: number;
   stickmen: number;
   filaments: GasRecord; // arcs are per-gas
