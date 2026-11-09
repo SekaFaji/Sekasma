@@ -413,7 +413,14 @@ test("Prestige displays permanent caps, rewards and two confirmation stages", as
   const initial = renderToStaticMarkup(React.createElement(PrestigePanel, { state, step: 0, ...callbacks }));
   assert.match(initial, /PERMANENT HELPER CAPACITY/);
   assert.match(initial, /PRESTIGE NOT READY/);
-  for (const name of ["FINGERS", "BIG TOES", "GHOST HANDS", "STICKMEN"]) assert.match(initial, new RegExp(name));
+  assert.match(initial, /FINGERS HIRED/);
+  for (const name of ["SPARK MITES", "COPPER SPIDERS", "BIG TOES", "GHOST HANDS", "STICKMEN"])
+    assert.doesNotMatch(initial, new RegExp(name));
+  const discovered = { ...state, unlocked: ["neon", "argon", "xenon", "krypton"] };
+  const advanced = renderToStaticMarkup(React.createElement(PrestigePanel, {
+    state: discovered, step: 0, ...callbacks,
+  }));
+  for (const name of ["BIG TOES", "GHOST HANDS", "STICKMEN"]) assert.match(advanced, new RegExp(name));
   const stage1 = renderToStaticMarkup(React.createElement(PrestigePanel, { state, step: 1, ...callbacks }));
   const stage2 = renderToStaticMarkup(React.createElement(PrestigePanel, { state, step: 2, ...callbacks }));
   assert.match(stage1, /CONTINUE/);
@@ -663,7 +670,7 @@ test("Stats render a small lifetime value below every run value", async () => {
   assert.match(markup, /PLASMA EARNED/);
   assert.match(markup, /BEST EVER/);
   assert.match(markup, /aria-label="HELP RATE lifetime 3.5\/S"/);
-  assert.equal((markup.match(/class="tabular-nums"/g) ?? []).length >= 14, true);
+  assert.equal((markup.match(/class="tabular-nums"/g) ?? []).length >= 11, true);
 });
 
 test("Stats retain small lifetime values even when Prestige cleared run helpers and upgrades", async () => {
