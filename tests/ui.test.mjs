@@ -177,7 +177,9 @@ test("original HELP, GAS and POWER upgrades remain visible", async () => {
   const help = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "help" }));
   const gas = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "gas" }));
   const power = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "power" }));
-  for (const label of ["FINGER", "BIG TOE", "GHOST HAND", "STICKMAN"]) assert.match(help, new RegExp(label));
+  assert.match(help, /FINGER/);
+  for (const label of ["SPARK MITE", "COPPER SPIDER", "BIG TOE", "GHOST HAND", "STICKMAN"])
+    assert.doesNotMatch(help, new RegExp(label));
   assert.match(gas, /ARGON GAS/);
   for (const label of ["NEON ARC", "NEON VOLTS", "NEON SPLIT"]) assert.match(power, new RegExp(label));
 });
@@ -717,30 +719,33 @@ test("Voltage Stats show current levels and separate old-step lifetime history",
   assert.match(html, /OLD 1500 STEPS/);
 });
 
-test("HELP tab renders each existing helper from the catalog with current lock rules", async () => {
-  const { HELPER_CATALOG } = await server.ssrLoadModule("/src/game/helpers.ts");
+test("HELP rows reveal only after earlier helper purchases and existing saves stay visible", async () => {
+  const { HELPER_CATALOG, helperVisible } = await server.ssrLoadModule("/src/game/helpers.ts");
   const { freshSave } = await import("../src/game/save.ts");
   const { gasById } = await import("../src/game/gases.ts");
-  const state = freshSave();
-  const props = {
-    state, unlockedGases: [gasById("neon")], accent: "#ff5ec8",
-    upTab: "help", onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {},
-  };
-  const html = renderToStaticMarkup(React.createElement(UpgradePanel, props));
-  assert.equal(HELPER_CATALOG.length, 4);
-  for (const helper of HELPER_CATALOG) assert.match(html, new RegExp(helper.name));
-  // Each locked helper appears once in visible text and once in its accessible title.
-  assert.equal((html.match(/UNLOCKS WITH /g) ?? []).length, 6);
-  assert.match(html, /POWER 1 · OWN 0\/30/);
-  assert.match(html, /UNLOCKS WITH ARGON GAS/);
-  assert.match(html, /UNLOCKS WITH XENON GAS/);
-  assert.match(html, /UNLOCKS WITH KRYPTON GAS/);
-  const unlocked = { ...state, unlocked: ["neon", "argon", "xenon", "krypton"] };
-  const all = renderToStaticMarkup(React.createElement(UpgradePanel, {
-    ...props, state: unlocked, unlockedGases: unlocked.unlocked.map(gasById),
+  const initial = freshSave();
+  const props = { state: initial, unlockedGases: [gasById("neon")], accent: "#ff5ec8",
+    upTab: "help", onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {} };
+  const view = state => renderToStaticMarkup(React.createElement(UpgradePanel, {
+    ...props, state, unlockedGases: state.unlocked.map(gasById),
   }));
-  assert.doesNotMatch(all, /UNLOCKS WITH /);
-  assert.match(all, /POWER 8 · OWN 0\/25/);
-  assert.match(all, /POWER 20 · OWN 0\/20/);
-  assert.match(all, /POWER 45 · OWN 0\/15/);
+  assert.equal(HELPER_CATALOG.length, 6);
+  assert.deepEqual(HELPER_CATALOG.filter(h => helperVisible(initial, h.id)).map(h => h.id), ["finger"]);
+  assert.doesNotMatch(view(initial), /SPARK MITE|COPPER SPIDER|BIG TOE/);
+  const withFinger = { ...initial, fingers: 1 };
+  assert.match(view(withFinger), /SPARK MITE/);
+  assert.doesNotMatch(view(withFinger), /COPPER SPIDER/);
+  const withMite = { ...withFinger, sparkMites: 1 };
+  assert.match(view(withMite), /COPPER SPIDER/);
+  assert.doesNotMatch(view(withMite), /BIG TOE/);
+  const withSpider = { ...withMite, copperSpiders: 1 };
+  assert.match(view(withSpider), /BIG TOE/);
+  assert.match(view(withSpider), /UNLOCKS WITH ARGON GAS/);
+  const existing = { ...initial, unlocked: ["neon", "argon", "xenon", "krypton"] };
+  for (const helper of HELPER_CATALOG) assert.match(view(existing), new RegExp(helper.name));
+  assert.doesNotMatch(view(existing), /UNLOCKS WITH /);
+  const afterPrestige = { ...initial, lifetime: { ...initial.lifetime,
+    helperHires: { ...initial.lifetime.helperHires, finger: 5, sparkMite: 2, copperSpider: 1 } } };
+  assert.match(view(afterPrestige), /COPPER SPIDER/);
+  assert.match(view(afterPrestige), /BIG TOE/);
 });
