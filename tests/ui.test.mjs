@@ -264,7 +264,7 @@ test("SEKASMA logo is pixel-drawn and keeps the Welcome Back mark reusable", () 
   assert.doesNotMatch(logo, /⚡/);
 });
 
-test("all four helper upgrades are rendered as compact rows on HELP", async () => {
+test("all six discovered helper upgrades are rendered as compact rows on HELP", async () => {
   const { freshSave } = await import("../src/game/save.ts");
   const { GAS_LIST } = await import("../src/game/gases.ts");
   const state = { ...freshSave(), unlocked: GAS_LIST.map(g => g.id), plasma: {
@@ -274,8 +274,8 @@ test("all four helper upgrades are rendered as compact rows on HELP", async () =
     state, unlockedGases: GAS_LIST, accent: "#ffd166", upTab: "help",
     onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {},
   }));
-  assert.equal((html.match(/min-h-\[89px\]/g) ?? []).length, 4);
-  for (const power of [1, 8, 20, 45]) assert.match(html, new RegExp(`POWER ${power} · OWN`));
+  assert.equal((html.match(/min-h-\[89px\]/g) ?? []).length, 6);
+  for (const power of [1, 3, 12, 8, 20, 45]) assert.match(html, new RegExp(`POWER ${power} · OWN`));
   assert.doesNotMatch(html, /× FINGER/);
   const app = renderToStaticMarkup(React.createElement(App));
   assert.match(app, /sekasma-panel-shell/);
