@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { accrueIdle, accrueOffline, bulkCost, cappedOfflineSeconds, fingerCost, purchaseUpgrade } from "../src/game/economy.ts";
 import { OFFLINE_CAP_S, HELPER_POWER, PRESS_INTERVAL, MAX_VOLT_LEVELS, VOLT_LEVEL_BONUS, voltMult } from "../src/game/config.ts";
-import { BACKUP_KEY, PRE_VOLTAGE_BACKUP_KEY, PRE_HELPER_BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
+import { BACKUP_KEY, PRE_VOLTAGE_BACKUP_KEY, PRE_HELPER_BACKUP_KEY, PRE_ARGON_BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
 import { measureTick } from "../src/game/timing.ts";
 import { visibleHelperCount, visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../src/render/limits.ts";
 import { advanceStickman, createStickman } from "../src/render/stickmen.ts";
@@ -326,11 +326,11 @@ test("all finger, toe, and stickman orbit rings fit inside the canvas without to
 });
 
 test("Prestige capacity starts independent for every helper", () => {
-  assert.deepEqual(BASE_CAPACITY, { finger: 30, sparkMite: 35, copperSpider: 20, toe: 25, ghost: 20, stickman: 15 });
-  assert.deepEqual(CAPACITY_STEP, { finger: 10, sparkMite: 10, copperSpider: 5, toe: 5, ghost: 5, stickman: 3 });
+  assert.deepEqual(BASE_CAPACITY, { finger: 30, sparkMite: 35, copperSpider: 20, toe: 25, conductivePalm: 25, orbitDrone: 18, ghost: 20, stickman: 15 });
+  assert.deepEqual(CAPACITY_STEP, { finger: 10, sparkMite: 10, copperSpider: 5, toe: 5, conductivePalm: 5, orbitDrone: 4, ghost: 5, stickman: 3 });
   const s = freshSave();
-  assert.deepEqual(s.prestige.capacityLevels, { finger: 0, sparkMite: 0, copperSpider: 0, toe: 0, ghost: 0, stickman: 0 });
-  for (const kind of ["finger", "sparkMite", "copperSpider", "toe", "ghost", "stickman"])
+  assert.deepEqual(s.prestige.capacityLevels, { finger: 0, sparkMite: 0, copperSpider: 0, toe: 0, conductivePalm: 0, orbitDrone: 0, ghost: 0, stickman: 0 });
+  for (const kind of ["finger", "sparkMite", "copperSpider", "toe", "conductivePalm", "orbitDrone", "ghost", "stickman"])
     assert.equal(helperCapacity(s, kind), BASE_CAPACITY[kind]);
   const wealthy = { ...s, plasma: { neon: 1e30, argon: 1e30, xenon: 1e30, krypton: 1e30 },
     unlocked: ["neon", "argon", "xenon", "krypton"] };
@@ -567,7 +567,7 @@ test("v17 lifetime history survives real save and reload without resetting save 
   s = purchaseUpgrade(s, "finger", undefined, 2).state;
   assert.equal(persist(s), true);
   const stored = JSON.parse(items.get(SAVE_KEY));
-  assert.equal(stored.v, 18);
+  assert.equal(stored.v, 19);
   assert.equal(loadSave().lifetime.helperHires.finger, 2);
   assert.equal(loadSave().fingers, 2);
   assert.equal(loadSave().lifetime.peakHelpRate.neon, s.lifetime.peakHelpRate.neon);
@@ -657,7 +657,7 @@ test("first legacy Voltage load stores an untouched snapshot through later autos
   assert.equal(persist({ ...migrated, fingers: 3 }), true);
   assert.equal(loadSave().legacyVoltage.neon, 1234);
   assert.equal(items.get(PRE_VOLTAGE_BACKUP_KEY), raw);
-  assert.equal(JSON.parse(items.get(SAVE_KEY)).v, 18);
+  assert.equal(JSON.parse(items.get(SAVE_KEY)).v, 19);
   resetSave();
   assert.equal(items.has(PRE_VOLTAGE_BACKUP_KEY), false);
 }));
@@ -678,7 +678,7 @@ test("helper catalog preserves v0.12.26 prices at early and mixed-currency thres
     helperUnlocked, isHelperId } = await import("../src/game/helpers.ts");
   const { fingerCost, toeCost, ghostCost, stickmanCost, buyMsg } = await import("../src/game/economy.ts");
   const { GAS_LIST } = await import("../src/game/gases.ts");
-  assert.deepEqual(HELPER_IDS, ["finger", "sparkMite", "copperSpider", "toe", "ghost", "stickman"]);
+  assert.deepEqual(HELPER_IDS, ["finger", "sparkMite", "copperSpider", "toe", "conductivePalm", "orbitDrone", "ghost", "stickman"]);
   assert.deepEqual(HELPER_CATALOG.filter(h => ["finger", "toe", "ghost", "stickman"].includes(h.id)).map(h => h.nativeGas), GAS_LIST.map(g => g.id));
   const gasSets = [
     ["neon"],
@@ -704,9 +704,9 @@ test("helper catalog preserves v0.12.26 prices at early and mixed-currency thres
       assert.deepEqual(stickmanCost(n), { krypton: Math.ceil(120 * 1.5 ** n) });
     }
   }
-  assert.deepEqual(HELPER_CATALOG.map(h => h.power), [1, 3, 12, 8, 20, 45]);
-  assert.deepEqual(HELPER_CATALOG.map(h => h.baseCapacity), [30, 35, 20, 25, 20, 15]);
-  assert.deepEqual(HELPER_CATALOG.map(h => h.capacityStep), [10, 10, 5, 5, 5, 3]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.power), [1, 3, 12, 8, 18, 50, 20, 45]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.baseCapacity), [30, 35, 20, 25, 25, 18, 20, 15]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.capacityStep), [10, 10, 5, 5, 5, 4, 5, 3]);
   assert.deepEqual([1, 2].map(n => buyMsg("finger", undefined, n)),
     ["+1 FINGER HIRED", "+2 FINGERS HIRED"]);
   assert.deepEqual([1, 2].map(n => buyMsg("toe", undefined, n)),
@@ -892,8 +892,154 @@ test("old helper save has a protected original snapshot through repeated autosav
   assert.equal(persist({ ...migrated, fingers: 9 }), true);
   assert.equal(items.get(PRE_HELPER_BACKUP_KEY), raw);
   const current = JSON.parse(items.get(SAVE_KEY));
-  assert.equal(current.v, 18);
+  assert.equal(current.v, 19);
   assert.equal(loadSave().fingers, 9);
   resetSave();
   assert.equal(items.has(PRE_HELPER_BACKUP_KEY), false);
+}));
+
+test("Argon helpers unlock sequentially with distinct price curves and production", async () => {
+  const { helperCost, helperVisible, helperUnlocked } = await import("../src/game/helpers.ts");
+  const start = freshSave();
+  start.unlocked = ["neon", "argon"];
+  start.plasma.neon = 1e7;
+  start.plasma.argon = 1e7;
+  assert.equal(helperVisible(start, "toe"), true);
+  assert.equal(helperVisible(start, "conductivePalm"), false);
+  assert.equal(helperVisible(start, "orbitDrone"), false);
+  assert.equal(bulkCost(start, "conductivePalm", undefined, 1).count, 0);
+  assert.equal(bulkCost(start, "orbitDrone", undefined, 1).count, 0);
+  assert.deepEqual(helperCost("conductivePalm", 0, start.unlocked), { argon: 220 });
+  assert.deepEqual(helperCost("conductivePalm", 1, start.unlocked), { argon: 286 });
+  assert.deepEqual(helperCost("orbitDrone", 0, start.unlocked), { argon: 2200 });
+  assert.deepEqual(helperCost("orbitDrone", 1, start.unlocked), { argon: 3080 });
+  const withToe = purchaseUpgrade(start, "toe", undefined, 1).state;
+  assert.equal(withToe.toes, 1);
+  assert.equal(helperUnlocked(withToe, "conductivePalm"), true);
+  assert.equal(helperVisible(withToe, "orbitDrone"), false);
+  assert.equal(bulkCost(withToe, "orbitDrone", undefined, 1).count, 0);
+  const withPalm = purchaseUpgrade(withToe, "conductivePalm", undefined, 1).state;
+  assert.equal(withPalm.conductivePalms, 1);
+  assert.equal(withPalm.lifetime.helperHires.conductivePalm, 1);
+  assert.equal(helperUnlocked(withPalm, "orbitDrone"), true);
+  assert.equal(helperVisible(withPalm, "ghost"), false);
+  const withDrone = purchaseUpgrade(withPalm, "orbitDrone", undefined, 1).state;
+  assert.equal(withDrone.orbitDrones, 1);
+  assert.equal(withDrone.lifetime.helperHires.orbitDrone, 1);
+  assert.equal(helperVisible(withDrone, "ghost"), true);
+  assert.ok(Math.abs(idleRate(withDrone).argon - (8 + 18 + 50) * .5 / PRESS_INTERVAL) < 1e-10);
+  assert.equal(start.orbitDrones, 0);
+  assert.equal(start.plasma.argon, 1e7);
+});
+
+test("Argon Mastery gates Xenon on produced Argon and Drone ownership, never unspent currency", async () => {
+  const { ARGON_MASTERY_REQUIRED, XENON_MASTER_PRICE, argonProducedThisRun,
+    argonMasteryProgress, argonChapterComplete, canDiscoverNextGas, nextGasMastery,
+  } = await import("../src/game/mastery.ts");
+  assert.equal(ARGON_MASTERY_REQUIRED, 60000);
+  assert.equal(XENON_MASTER_PRICE, 12000);
+  const start = freshSave();
+  start.unlocked = ["neon", "argon"];
+  start.plasma.argon = 1e9;
+  assert.equal(canDiscoverNextGas(start), false);
+  assert.equal(bulkCost(start, "gas", undefined, 1).count, 0);
+  start.total.argon = 30000;
+  assert.equal(argonMasteryProgress(start), 50);
+  start.total.argon = 60000;
+  assert.equal(argonChapterComplete(start), false, "cannot bypass Drone");
+  let earned = purchaseUpgrade(start, "toe", undefined, 1).state;
+  earned = purchaseUpgrade(earned, "conductivePalm", undefined, 1).state;
+  earned = purchaseUpgrade(earned, "orbitDrone", undefined, 1).state;
+  assert.equal(argonChapterComplete(earned), true);
+  assert.equal(nextGasMastery(earned).nextGas, "XENON");
+  assert.equal(bulkCost(earned, "gas", undefined, 1).cost.argon, 12000);
+  const purchased = purchaseUpgrade(earned, "gas", undefined, 1);
+  assert.equal(purchased.count, 1);
+  assert.deepEqual(purchased.state.unlocked, ["neon", "argon", "xenon"]);
+  assert.equal(purchased.state.plasma.argon, earned.plasma.argon - 12000);
+  assert.equal(nextGasMastery(purchased.state), null);
+  const spent = { ...earned, plasma: { ...earned.plasma, argon: 0 } };
+  assert.equal(argonMasteryProgress(spent), 100);
+  assert.equal(bulkCost(spent, "gas", undefined, 1).count, 0);
+  const newerRun = { ...earned, prestige: { ...earned.prestige,
+    lastTotal: { ...earned.prestige.lastTotal, argon: 15000 } } };
+  assert.equal(argonProducedThisRun(newerRun), 45000);
+  assert.equal(bulkCost(newerRun, "gas", undefined, 1).count, 0);
+});
+
+test("v18 save migration retains existing helper purchases, mixed gases, and permanent caps", () => {
+  const old = freshSave();
+  old.unlocked = ["neon", "argon", "xenon"];
+  old.toes = 8;
+  old.copperSpiders = 2;
+  old.plasma = { neon: 1234, argon: 30000, xenon: 120, krypton: 0 };
+  old.total = { neon: 200000, argon: 70000, xenon: 1000, krypton: 0 };
+  old.voltage.argon = 7;
+  old.prestige.capacityLevels.toe = 2;
+  old.lifetime.helperHires.toe = 25;
+  const beforeRate = idleRate(old);
+  const { conductivePalms, orbitDrones, ...rawOld } = old;
+  void conductivePalms; void orbitDrones;
+  const saved = { ...rawOld, v: 18,
+    lifetime: { ...rawOld.lifetime, helperHires: {
+      finger: 0, sparkMite: 0, copperSpider: 2, toe: 25, ghost: 0, stickman: 0,
+    } },
+    prestige: { ...rawOld.prestige, capacityLevels: {
+      finger: 0, sparkMite: 0, copperSpider: 0, toe: 2, ghost: 0, stickman: 0,
+    } },
+  };
+  const restored = migrateSave(saved);
+  assert.deepEqual(restored.unlocked, old.unlocked);
+  assert.deepEqual(restored.plasma, old.plasma);
+  assert.deepEqual(restored.total, old.total);
+  assert.equal(restored.voltage.argon, 7);
+  assert.equal(restored.conductivePalms, 0);
+  assert.equal(restored.orbitDrones, 0);
+  assert.equal(restored.toes, 8);
+  assert.equal(restored.lifetime.helperHires.toe, 25);
+  assert.equal(restored.lifetime.helperHires.conductivePalm, 0);
+  assert.equal(restored.prestige.capacityLevels.toe, 2);
+  assert.deepEqual(idleRate(restored), beforeRate);
+});
+
+test("v19 retains Argon helper history after Prestige and save round-trip", () => {
+  const s = freshSave();
+  s.unlocked = ["neon", "argon", "xenon", "krypton"];
+  s.plasma = { neon: 1e9, argon: 1e9, xenon: 1e9, krypton: 1e9 };
+  const palm = purchaseUpgrade(s, "conductivePalm", undefined, 2).state;
+  const drone = purchaseUpgrade(palm, "orbitDrone", undefined, 3).state;
+  assert.equal(drone.conductivePalms, 2);
+  assert.equal(drone.orbitDrones, 3);
+  assert.equal(drone.lifetime.helperHires.conductivePalm, 2);
+  assert.equal(drone.lifetime.helperHires.orbitDrone, 3);
+  drone.total.krypton = 3000;
+  const reset = performPrestige(drone);
+  assert.equal(reset.conductivePalms, 0);
+  assert.equal(reset.orbitDrones, 0);
+  assert.equal(reset.lifetime.helperHires.conductivePalm, 2);
+  assert.equal(reset.lifetime.helperHires.orbitDrone, 3);
+  const reloaded = migrateSave({ ...reset, v: 19 });
+  assert.equal(reloaded.lifetime.helperHires.orbitDrone, 3);
+  assert.equal(reloaded.prestige.capacityLevels.orbitDrone, 0);
+});
+
+test("Argon migration preserves an untouched v18 snapshot through autosaves", () => withStorage((items) => {
+  const old = freshSave();
+  old.toes = 8;
+  old.unlocked = ["neon", "argon"];
+  const { conductivePalms, orbitDrones, ...prior } = old;
+  void conductivePalms; void orbitDrones;
+  const raw = JSON.stringify({ ...prior, v: 18 });
+  items.set(SAVE_KEY, raw);
+  const migrated = loadSave();
+  assert.equal(migrated.toes, 8);
+  assert.equal(migrated.conductivePalms, 0);
+  assert.equal(items.get(PRE_ARGON_BACKUP_KEY), raw);
+  assert.equal(persist(migrated), true);
+  assert.equal(persist({ ...migrated, toes: 11 }), true);
+  assert.equal(items.get(PRE_ARGON_BACKUP_KEY), raw);
+  assert.equal(JSON.parse(items.get(SAVE_KEY)).v, 19);
+  assert.equal(loadSave().toes, 11);
+  resetSave();
+  assert.equal(items.has(PRE_ARGON_BACKUP_KEY), false);
 }));

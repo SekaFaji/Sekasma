@@ -264,7 +264,7 @@ test("SEKASMA logo is pixel-drawn and keeps the Welcome Back mark reusable", () 
   assert.doesNotMatch(logo, /⚡/);
 });
 
-test("all six discovered helper upgrades are rendered as compact rows on HELP", async () => {
+test("all eight discovered helper upgrades are rendered as compact rows on HELP", async () => {
   const { freshSave } = await import("../src/game/save.ts");
   const { GAS_LIST } = await import("../src/game/gases.ts");
   const state = { ...freshSave(), unlocked: GAS_LIST.map(g => g.id), plasma: {
@@ -274,8 +274,8 @@ test("all six discovered helper upgrades are rendered as compact rows on HELP", 
     state, unlockedGases: GAS_LIST, accent: "#ffd166", upTab: "help",
     onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {},
   }));
-  assert.equal((html.match(/min-h-\[89px\]/g) ?? []).length, 6);
-  for (const power of [1, 3, 12, 8, 20, 45]) assert.match(html, new RegExp(`POWER ${power} · OWN`));
+  assert.equal((html.match(/min-h-\[89px\]/g) ?? []).length, 8);
+  for (const power of [1, 3, 12, 8, 18, 50, 20, 45]) assert.match(html, new RegExp(`POWER ${power} · OWN`));
   assert.doesNotMatch(html, /× FINGER/);
   const app = renderToStaticMarkup(React.createElement(App));
   assert.match(app, /sekasma-panel-shell/);
@@ -736,7 +736,7 @@ test("HELP rows reveal only after earlier helper purchases and existing saves st
   const view = state => renderToStaticMarkup(React.createElement(UpgradePanel, {
     ...props, state, unlockedGases: state.unlocked.map(gasById),
   }));
-  assert.equal(HELPER_CATALOG.length, 6);
+  assert.equal(HELPER_CATALOG.length, 8);
   assert.deepEqual(HELPER_CATALOG.filter(h => helperVisible(initial, h.id)).map(h => h.id), ["finger"]);
   assert.doesNotMatch(view(initial), /SPARK MITE|COPPER SPIDER|BIG TOE/);
   const withFinger = { ...initial, fingers: 1 };
@@ -812,5 +812,91 @@ test("Neon pixel-art atlas has three distinct detailed poses per helper", async 
       variants.add(sprite.join("|"));
     }
     assert.equal(variants.size, 3, "walk A, walk B and discharge must differ");
+  }
+});
+
+test("Argon helper discovery reveals one new helper at a time in HELP and Stats", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const { helperVisible } = await server.ssrLoadModule("/src/game/helpers.ts");
+  const initial = freshSave();
+  initial.unlocked = ["neon", "argon"];
+  const props = { unlockedGases: [gasById("neon"), gasById("argon")], accent: "#817fff",
+    upTab: "help", onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {} };
+  const view = state => renderToStaticMarkup(React.createElement(UpgradePanel, { ...props, state }));
+  assert.equal(helperVisible(initial, "toe"), true);
+  assert.equal(helperVisible(initial, "conductivePalm"), false);
+  assert.equal(helperVisible(initial, "orbitDrone"), false);
+  assert.match(view(initial), /BIG TOE/);
+  assert.doesNotMatch(view(initial), /CONDUCTIVE PALM|ORBIT DRONE|GHOST HAND/);
+  const toe = { ...initial, toes: 1 };
+  assert.match(view(toe), /CONDUCTIVE PALM/);
+  assert.doesNotMatch(view(toe), /ORBIT DRONE/);
+  const palm = { ...toe, conductivePalms: 1 };
+  assert.match(view(palm), /ORBIT DRONE/);
+  assert.match(view(palm), /UNLOCKS WITH XENON GAS|CONDUCTIVE PALM/);
+  const drone = { ...palm, orbitDrones: 1 };
+  assert.match(view(drone), /GHOST HAND/);
+  const historical = { ...initial, unlocked: ["neon", "argon", "xenon"] };
+  assert.match(view(historical), /CONDUCTIVE PALM/);
+  assert.match(view(historical), /ORBIT DRONE/);
+  const afterReset = { ...initial, lifetime: { ...initial.lifetime,
+    helperHires: { ...initial.lifetime.helperHires, toe: 8, conductivePalm: 3 } } };
+  assert.match(view(afterReset), /CONDUCTIVE PALM/);
+  assert.match(view(afterReset), /ORBIT DRONE/);
+  const stats = renderToStaticMarkup(React.createElement(StatsPanel, {
+    state: afterReset, unlockedGases: props.unlockedGases,
+    rates: { neon: 0, argon: 0, xenon: 0, krypton: 0 },
+  }));
+  assert.match(stats, /ORBIT DRONES/);
+  assert.match(stats, /CONDUCTIVE PALMS/);
+});
+
+test("Argon Mastery shows earned-production progress, hidden clues and Xenon availability", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const state = freshSave();
+  state.unlocked = ["neon", "argon"];
+  state.total.argon = 30000;
+  state.plasma.argon = 1e9;
+  const props = { state, unlockedGases: [gasById("neon"), gasById("argon")],
+    accent: "#817fff", upTab: "gas",
+    onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {} };
+  const view = st => renderToStaticMarkup(React.createElement(UpgradePanel, {
+    ...props, state: st,
+  }));
+  const early = view(state);
+  assert.match(early, /ARGON MASTERY/);
+  assert.match(early, /aria-label="Argon Mastery progress"/);
+  assert.match(early, /aria-valuenow="50"/);
+  assert.match(early, /DISCOVER MORE ARGON HELPERS TO ADVANCE/);
+  assert.doesNotMatch(early, /BUY AN ORBIT DRONE/);
+  assert.match(early, /REQUIRES ARGON MASTERY/);
+  const palm = view({ ...state, conductivePalms: 1 });
+  assert.match(palm, /BUY AN ORBIT DRONE TO COMPLETE MASTERY/);
+  const ready = view({ ...state, total: { ...state.total, argon: 60000 }, orbitDrones: 1 });
+  assert.match(ready, /XENON DISCOVERY AVAILABLE/);
+  assert.match(ready, /aria-valuenow="100"/);
+  assert.match(ready, /NEW CURRENCY/);
+  assert.doesNotMatch(ready, /REQUIRES ARGON MASTERY/);
+});
+
+test("original Argon pixel sprites have three non-identical poses and full palettes", async () => {
+  const art = await server.ssrLoadModule("/src/render/argonCreatures.ts");
+  for (const [frames, palette, width, height] of [
+    [art.CONDUCTIVE_PALM_FRAMES, art.PALM_PALETTE, 17, 19],
+    [art.ORBIT_DRONE_FRAMES, art.DRONE_PALETTE, 19, 15],
+  ]) {
+    assert.equal(frames.length, 3);
+    const poses = new Set();
+    for (const frame of frames) {
+      assert.equal(frame.length, height);
+      assert.ok(frame.every(row => row.length === width));
+      assert.ok(frame.join("").includes("5"), "electric glass-contact highlights visible");
+      for (const pixel of frame.join(""))
+        assert.ok(pixel === "." || palette[pixel], `invalid Argon palette index ${pixel}`);
+      poses.add(frame.join("|"));
+    }
+    assert.equal(poses.size, 3, "walk and strike poses should be distinct");
   }
 });
