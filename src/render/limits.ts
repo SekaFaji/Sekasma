@@ -3,9 +3,9 @@
  * Economic ownership is never limited by drawing or special-effects budgets.
  * Expensive arc/ripple effects are sampled separately for mobile performance.
  */
-export type HelperKind = "fingers" | "mites" | "spiders" | "toes" | "ghosts" | "stickmen";
+export type HelperKind = "fingers" | "mites" | "spiders" | "toes" | "palms" | "drones" | "ghosts" | "stickmen";
 /** Legacy four-way count API remains compatible; new creatures are drawn separately. */
-export type HelperCounts = Record<Exclude<HelperKind, "mites" | "spiders">, number>;
+export type HelperCounts = Record<Exclude<HelperKind, "mites" | "spiders" | "palms" | "drones">, number>;
 
 export function visibleHelperCount(count: number, _kind: HelperKind): number {
   return Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
@@ -30,6 +30,8 @@ export function helperOrbitRadius(kind: HelperKind, index: number, ballRadius: n
   const ring = Math.max(0, Math.floor(index)) % 3;
   if (kind === "mites") return ballRadius - 20 - ring * 5;
   if (kind === "spiders") return ballRadius - 18 - ring * 5;
+  if (kind === "palms") return ballRadius - 19 - ring * 5;
+  if (kind === "drones") return ballRadius + 3 - ring * 4;
   if (kind === "ghosts") return ballRadius - 15 - ring * 10; // keep the enlarged spectral palm within the glass
   // Larger detailed 45-degree poses must remain entirely in the 150px field.
   // Pull fingers and toes inward, never clamp them to the canvas edges.
