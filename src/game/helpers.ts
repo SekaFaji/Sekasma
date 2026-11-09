@@ -145,7 +145,7 @@ export function helperVisible(state: GameState, id: HelperId): boolean {
     helperOwned(state, helper.revealAfter) > 0 ||
     (state.lifetime?.helperHires?.[helper.revealAfter] ?? 0) > 0 ||
     (helper.revealWhenGas !== undefined && state.unlocked.includes(helper.revealWhenGas)) ||
-    (helper.nativeGas !== "neon" && state.unlocked.includes(helper.nativeGas)) ||
+    (helper.nativeGas !== "neon" && helper.revealWhenGas === undefined && state.unlocked.includes(helper.nativeGas)) ||
     (helper.nativeGas === "neon" && state.unlocked.includes("argon"));
 }
 export function helperUnlocked(state: GameState, id: HelperId): boolean {
