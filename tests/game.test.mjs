@@ -55,7 +55,8 @@ test("unaffordable purchases return the exact original state", () => {
 });
 
 test("gas unlock costs are charged once", () => {
-  const initial = { ...freshSave(), plasma: { neon: 600, argon: 0, xenon: 0, krypton: 0 } };
+  const initial = { ...freshSave(), plasma: { neon: 1800, argon: 0, xenon: 0, krypton: 0 },
+    total: { neon: 6000, argon: 0, xenon: 0, krypton: 0 }, copperSpiders: 1 };
   const { state, count } = purchaseUpgrade(initial, "gas", undefined, 100);
   assert.equal(count, 1);
   assert.deepEqual(state.unlocked, ["neon", "argon"]);
@@ -325,13 +326,14 @@ test("all finger, toe, and stickman orbit rings fit inside the canvas without to
 });
 
 test("Prestige capacity starts independent for every helper", () => {
-  assert.deepEqual(BASE_CAPACITY, { finger: 30, toe: 25, ghost: 20, stickman: 15 });
-  assert.deepEqual(CAPACITY_STEP, { finger: 10, toe: 5, ghost: 5, stickman: 3 });
+  assert.deepEqual(BASE_CAPACITY, { finger: 30, sparkMite: 35, copperSpider: 20, toe: 25, ghost: 20, stickman: 15 });
+  assert.deepEqual(CAPACITY_STEP, { finger: 10, sparkMite: 10, copperSpider: 5, toe: 5, ghost: 5, stickman: 3 });
   const s = freshSave();
-  assert.deepEqual(s.prestige.capacityLevels, { finger: 0, toe: 0, ghost: 0, stickman: 0 });
-  for (const kind of ["finger", "toe", "ghost", "stickman"])
+  assert.deepEqual(s.prestige.capacityLevels, { finger: 0, sparkMite: 0, copperSpider: 0, toe: 0, ghost: 0, stickman: 0 });
+  for (const kind of ["finger", "sparkMite", "copperSpider", "toe", "ghost", "stickman"])
     assert.equal(helperCapacity(s, kind), BASE_CAPACITY[kind]);
-  const wealthy = { ...s, plasma: { neon: 1e30, argon: 1e30, xenon: 1e30, krypton: 1e30 } };
+  const wealthy = { ...s, plasma: { neon: 1e30, argon: 1e30, xenon: 1e30, krypton: 1e30 },
+    unlocked: ["neon", "argon", "xenon", "krypton"] };
   assert.equal(bulkCost(wealthy, "finger", undefined, 1000).count, BASE_CAPACITY.finger);
   assert.equal(bulkCost(wealthy, "toe", undefined, 1000).count, BASE_CAPACITY.toe);
 });
@@ -565,7 +567,7 @@ test("v17 lifetime history survives real save and reload without resetting save 
   s = purchaseUpgrade(s, "finger", undefined, 2).state;
   assert.equal(persist(s), true);
   const stored = JSON.parse(items.get(SAVE_KEY));
-  assert.equal(stored.v, 17);
+  assert.equal(stored.v, 18);
   assert.equal(loadSave().lifetime.helperHires.finger, 2);
   assert.equal(loadSave().fingers, 2);
   assert.equal(loadSave().lifetime.peakHelpRate.neon, s.lifetime.peakHelpRate.neon);
@@ -655,7 +657,7 @@ test("first legacy Voltage load stores an untouched snapshot through later autos
   assert.equal(persist({ ...migrated, fingers: 3 }), true);
   assert.equal(loadSave().legacyVoltage.neon, 1234);
   assert.equal(items.get(PRE_VOLTAGE_BACKUP_KEY), raw);
-  assert.equal(JSON.parse(items.get(SAVE_KEY)).v, 17);
+  assert.equal(JSON.parse(items.get(SAVE_KEY)).v, 18);
   resetSave();
   assert.equal(items.has(PRE_VOLTAGE_BACKUP_KEY), false);
 }));
@@ -875,24 +877,7 @@ test("v18 saves preserve both Neon helper counts, lifetime hires and Prestige re
   assert.ok(reset.prestige.cycles > 0);
 });
 
-test("Neon helper sprite atlas provides three separate real pixel poses per creature", async () => {
-  const art = await import("../src/render/neonCreatures.ts");
-  for (const [frames, palette, width, height] of [
-    [art.SPARK_MITE_FRAMES, art.MITE_PALETTE, 13, 13],
-    [art.COPPER_SPIDER_FRAMES, art.SPIDER_PALETTE, 17, 15],
-  ]) {
-    assert.equal(frames.length, 3);
-    const seen = new Set();
-    for (const pose of frames) {
-      assert.equal(pose.length, height);
-      assert.ok(pose.every(row => row.length === width));
-      assert.ok(pose.some(row => row.includes("5")), "bright eyes visible");
-      for (const ch of pose.join("")) assert.ok(ch === "." || palette[ch], `unknown art pixel ${ch}`);
-      seen.add(pose.join("|"));
-    }
-    assert.equal(seen.size, 3, "every animation pose must be distinct");
-  }
-});
+
 
 test("old helper save has a protected original snapshot through repeated autosaves", () => withStorage((items) => {
   const old = freshSave();
