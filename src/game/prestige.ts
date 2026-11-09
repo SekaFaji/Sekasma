@@ -55,7 +55,7 @@ export function performPrestige(s: GameState): GameState {
   return {
     ...s,
     plasma: zero3(), voltage: zero3(), legacyVoltage: zero3(), filaments: zero3(), splits: zero3(),
-    unlocked: ["neon"], fingers: 0, toes: 0, ghosts: 0, stickmen: 0,
+    unlocked: ["neon"], fingers: 0, sparkMites: 0, copperSpiders: 0, toes: 0, ghosts: 0, stickmen: 0,
     lastSeen: Date.now(),
     // Lifetime counters and historical best rates persist without modification.
     lifetime: {
