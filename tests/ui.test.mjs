@@ -749,3 +749,40 @@ test("HELP rows reveal only after earlier helper purchases and existing saves st
   assert.match(view(afterPrestige), /COPPER SPIDER/);
   assert.match(view(afterPrestige), /BIG TOE/);
 });
+
+test("Neon Mastery UI describes cumulative run earnings and the Spider requirement", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const state = freshSave();
+  state.plasma.neon = 200000;
+  state.total.neon = 3000;
+  const props = { state, unlockedGases: [gasById("neon")], accent: "#ff5ec8",
+    upTab: "gas", onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {} };
+  const html = renderToStaticMarkup(React.createElement(UpgradePanel, props));
+  assert.match(html, /NEON MASTERY/);
+  assert.match(html, /aria-label="Neon Mastery progress"/);
+  assert.match(html, /aria-valuenow="50"/);
+  assert.match(html, /BUY A COPPER SPIDER TO COMPLETE MASTERY/);
+  assert.match(html, /REQUIRES NEON MASTERY/);
+  assert.match(html, /disabled=""/);
+  const ready = { ...state, copperSpiders: 1, total: { ...state.total, neon: 6000 } };
+  const complete = renderToStaticMarkup(React.createElement(UpgradePanel, {
+    ...props, state: ready,
+  }));
+  assert.match(complete, /ARGON DISCOVERY AVAILABLE/);
+  assert.match(complete, /aria-valuenow="100"/);
+  assert.match(complete, /NEW CURRENCY/);
+});
+
+test("Neon sprites are available as full-color icons, without emoji or image assets", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const state = { ...freshSave(), fingers: 1, sparkMites: 1 };
+  const html = renderToStaticMarkup(React.createElement(UpgradePanel, {
+    state, unlockedGases: [gasById("neon")], accent: "#ff5ec8", upTab: "help",
+    onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {},
+  }));
+  assert.match(html, /SPARK MITE/);
+  assert.match(html, /COPPER SPIDER/);
+  assert.match(html, /<canvas/);
+});
