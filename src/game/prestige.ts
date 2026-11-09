@@ -11,7 +11,7 @@ export const MIN_PRESTIGE_SCORE = 100_000;
 export function freshPrestige(): PrestigeProgress {
   return {
     cycles: 0, sparks: 0, lifetimeSparks: 0,
-    capacityLevels: { finger: 0, toe: 0, ghost: 0, stickman: 0 },
+    capacityLevels: Object.fromEntries(HELPER_IDS.map(id => [id, 0])) as import("./types.ts").HelperRecord,
     legacyCapacity: { ...BASE_CAPACITY },
     lastTotal: zero3(),
   };
@@ -55,7 +55,7 @@ export function performPrestige(s: GameState): GameState {
   return {
     ...s,
     plasma: zero3(), voltage: zero3(), legacyVoltage: zero3(), filaments: zero3(), splits: zero3(),
-    unlocked: ["neon"], fingers: 0, toes: 0, ghosts: 0, stickmen: 0,
+    unlocked: ["neon"], fingers: 0, sparkMites: 0, copperSpiders: 0, toes: 0, ghosts: 0, stickmen: 0,
     lastSeen: Date.now(),
     // Lifetime counters and historical best rates persist without modification.
     lifetime: {

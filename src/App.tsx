@@ -270,6 +270,8 @@ export default function App() {
             voltage={state.voltage}
             unlocked={unlockedGases}
             fingers={state.fingers}
+            sparkMites={state.sparkMites}
+            copperSpiders={state.copperSpiders}
             toes={state.toes}
             crackles={state.crackles}
             neonPow={neonPow}

@@ -7,9 +7,10 @@ import { MAX_VOLT_LEVELS, MAX_VOLT_STEPS, SPLIT_CAP, VOLT_STEP, zero3 } from "./
 import type { GasId, GameState, HelperId, HelperRecord, LifetimeStats, PrestigeProgress } from "./types.ts";
 import { cracklePower, idleRate } from "./economy.ts";
 import { BASE_CAPACITY, HELPERS, freshPrestige } from "./prestige.ts";
+import { helperOwned } from "./helpers.ts";
 
 export const SAVE_KEY = "idle-plasma-ball-save-v10";
-// Keep existing save keys stable for old installs. The internal schema is v17.
+// Keep existing save keys stable for old installs. The internal schema is v18.
 export const BACKUP_KEY = "idle-plasma-ball-save-backup-v12";
 export const LEGACY_V9_KEY = "idle-plasma-ball-save-v9";
 export const LEGACY_V8_KEY = "idle-plasma-ball-save-v8";
@@ -17,6 +18,8 @@ export const LEGACY_V6_KEY = "idle-plasma-ball-save-v6";
 export const OPTS_KEY = "idle-plasma-ball-opts-v1";
 /** One-time read-only snapshot before the old Voltage economy is converted. */
 export const PRE_VOLTAGE_BACKUP_KEY = "idle-plasma-ball-before-voltage-v17";
+/** Stable original snapshot before first Neon helper save expansion. */
+export const PRE_HELPER_BACKUP_KEY = "idle-plasma-ball-before-neon-v18";
 
 export function loadOpts(): { scan: boolean; buzz: boolean } {
   try {
@@ -33,7 +36,7 @@ export function loadOpts(): { scan: boolean; buzz: boolean } {
 
 export function freshLifetime(): LifetimeStats {
   return {
-    helperHires: { finger: 0, toe: 0, ghost: 0, stickman: 0 },
+    helperHires: { finger: 0, sparkMite: 0, copperSpider: 0, toe: 0, ghost: 0, stickman: 0 },
     purchasedArcs: zero3(),
     purchasedSplits: zero3(),
     purchasedVoltage: zero3(),
@@ -48,7 +51,7 @@ export function freshSave(): GameState {
   const now = Date.now();
   return {
     plasma: zero3(), total: zero3(), crackles: 0,
-    voltage: zero3(), legacyVoltage: zero3(), fingers: 0, toes: 0, ghosts: 0, stickmen: 0,
+    voltage: zero3(), legacyVoltage: zero3(), fingers: 0, sparkMites: 0, copperSpiders: 0, toes: 0, ghosts: 0, stickmen: 0,
     filaments: zero3(), splits: zero3(), unlocked: ["neon"],
     created: now, lastSeen: now, activeSeconds: 0, offlineSeconds: 0,
     prestige: freshPrestige(),
@@ -99,10 +102,11 @@ function sanitizeSave(s: GameState, fromOldVoltage = false): GameState {
   const originalCap = capacityRecord(rawPrestige.legacyCapacity, BASE_CAPACITY);
   // v0.12.19 saved its old default limits as "legacy" capacity, even for
   // brand-new accounts. Normalize those defaults without deleting any helpers.
-  const previousBase: HelperRecord = { finger: 100, toe: 60, ghost: 40, stickman: 40 };
+  const previousBase: Partial<HelperRecord> = { finger: 100, toe: 60, ghost: 40, stickman: 40 };
   const legacyCapacity = { ...originalCap };
   for (const [kind, owned] of [
-    ["finger", s.fingers], ["toe", s.toes], ["ghost", s.ghosts], ["stickman", s.stickmen],
+    ["finger", s.fingers], ["sparkMite", s.sparkMites], ["copperSpider", s.copperSpiders],
+    ["toe", s.toes], ["ghost", s.ghosts], ["stickman", s.stickmen],
   ] as [HelperId, number][]) {
     const preserved = originalCap[kind] === previousBase[kind] ? BASE_CAPACITY[kind] : originalCap[kind];
     legacyCapacity[kind] = Math.max(BASE_CAPACITY[kind], preserved, Math.floor(validNumber(owned)));
@@ -113,6 +117,8 @@ function sanitizeSave(s: GameState, fromOldVoltage = false): GameState {
   const baseline = freshLifetime();
   const helperHires = capacityRecord(prior.helperHires, {
     finger: Math.floor(validNumber(s.fingers)),
+    sparkMite: Math.floor(validNumber(s.sparkMites)),
+    copperSpider: Math.floor(validNumber(s.copperSpiders)),
     toe: Math.floor(validNumber(s.toes)),
     ghost: Math.floor(validNumber(s.ghosts)),
     stickman: Math.floor(validNumber(s.stickmen)),
@@ -151,6 +157,8 @@ function sanitizeSave(s: GameState, fromOldVoltage = false): GameState {
     crackles: Math.floor(validNumber(s.crackles)),
     voltage, legacyVoltage, filaments, splits, unlocked,
     fingers: Math.floor(validNumber(s.fingers)),
+    sparkMites: Math.floor(validNumber(s.sparkMites)),
+    copperSpiders: Math.floor(validNumber(s.copperSpiders)),
     toes: Math.floor(validNumber(s.toes)),
     ghosts: Math.floor(validNumber(s.ghosts)),
     stickmen: Math.floor(validNumber(s.stickmen)),
@@ -174,8 +182,7 @@ function sanitizeSave(s: GameState, fromOldVoltage = false): GameState {
       lifetime.peakTapPower[id] = Math.max(lifetime.peakTapPower[id], cracklePower(gas, normalized));
   }
   for (const kind of HELPERS) {
-    const held = kind === "finger" ? normalized.fingers : kind === "toe" ? normalized.toes
-      : kind === "ghost" ? normalized.ghosts : normalized.stickmen;
+    const held = helperOwned(normalized, kind);
     lifetime.helperHires[kind] = Math.max(lifetime.helperHires[kind], held);
   }
   return normalized;
@@ -184,8 +191,8 @@ function sanitizeSave(s: GameState, fromOldVoltage = false): GameState {
 // Migrate old micro-voltage saves into the new level system without changing power.
 export function migrateSave(old: Record<string, unknown>): GameState {
   const base = freshSave();
-  // v17 already uses levels; all earlier versions use micro-volt steps.
-  if (old.v === 17 || old.v === 16 || old.v === 15 || old.v === 14 || old.v === 13 || old.v === 12 || old.v === 11 || old.v === 10 || old.v === 9) {
+  // v17-v18 use new Voltage levels; older versions use micro-volt steps.
+  if (old.v === 18 || old.v === 17 || old.v === 16 || old.v === 15 || old.v === 14 || old.v === 13 || old.v === 12 || old.v === 11 || old.v === 10 || old.v === 9) {
     const s = { ...base, ...(old as unknown as GameState) };
     // Old snapshots never had lifetime counters. Distinguish "not recorded"
     // from fresh zeroes so older Prestiges are not counted as this run.
@@ -194,7 +201,7 @@ export function migrateSave(old: Record<string, unknown>): GameState {
     if (!s.splits) s.splits = zero3();
     if (typeof s.ghosts !== "number") s.ghosts = 0;
     if (typeof s.stickmen !== "number") s.stickmen = 0;
-    return sanitizeSave(s, old.v !== 17);
+    return sanitizeSave(s, old.v !== 17 && old.v !== 18);
   }
   // v6 save: single currency, volts were x2 levels
   if (typeof old.plasma === "number") {
@@ -251,9 +258,13 @@ export function loadSave(): GameState | null {
       if (typeof candidate.fingers !== "number" || !Number.isFinite(candidate.fingers)) continue;
       // Preserve the exact pre-migration snapshot in a separate storage slot.
       // Normal autosaves rotate BACKUP_KEY; this one never gets overwritten.
-      if (candidate.v !== 17 && !window.localStorage.getItem(PRE_VOLTAGE_BACKUP_KEY)) {
+      if (candidate.v !== 17 && candidate.v !== 18 && !window.localStorage.getItem(PRE_VOLTAGE_BACKUP_KEY)) {
         try { window.localStorage.setItem(PRE_VOLTAGE_BACKUP_KEY, raw); }
         catch { /* Limited storage; the in-memory migration still proceeds. */ }
+      }
+      if (candidate.v !== 18 && !window.localStorage.getItem(PRE_HELPER_BACKUP_KEY)) {
+        try { window.localStorage.setItem(PRE_HELPER_BACKUP_KEY, raw); }
+        catch { /* Save continues if storage is full. */ }
       }
       return migrateSave(candidate);
     } catch {
@@ -279,7 +290,7 @@ export function persist(s: GameState): boolean {
         // Leave the existing backup untouched.
       }
     }
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 17 }));
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify({ ...s, lastSeen: Date.now(), v: 18 }));
     return true;
   } catch {
     // No storage (e.g. private browsing): retain the in-memory session.
@@ -291,7 +302,7 @@ export function persist(s: GameState): boolean {
 export function resetSave(): GameState {
   const fresh = freshSave();
   try {
-    for (const key of [SAVE_KEY, BACKUP_KEY, LEGACY_V9_KEY, LEGACY_V8_KEY, LEGACY_V6_KEY, PRE_VOLTAGE_BACKUP_KEY]) {
+    for (const key of [SAVE_KEY, BACKUP_KEY, LEGACY_V9_KEY, LEGACY_V8_KEY, LEGACY_V6_KEY, PRE_VOLTAGE_BACKUP_KEY, PRE_HELPER_BACKUP_KEY]) {
       window.localStorage.removeItem(key);
     }
   } catch {

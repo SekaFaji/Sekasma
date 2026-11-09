@@ -21,20 +21,23 @@ import {
   drawPixelText,
 } from "../render/sprites";
 import { drawPlasmaArc, pixelCircle } from "../render/plasma";
-import { visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../render/limits";
+import { visibleHelperCount, visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../render/limits";
 import { advanceStickman, createStickman, type StickmanMotion } from "../render/stickmen";
 import { drawStickman } from "../render/stickmanArt";
+import { drawNeonCreature } from "../render/neonCreatures";
 import type { Ripple, FloatText, Flash, HoldArc, Wanderer } from "../render/plasma";
 import type { Gas, GasRecord } from "../game/types";
 
 export default function PlasmaBall({
-  filaments, splits, voltage, unlocked, fingers, toes, ghosts, stickmen, crackles, neonPow, onCrackle, buzzOn,
+  filaments, splits, voltage, unlocked, fingers, sparkMites, copperSpiders, toes, ghosts, stickmen, crackles, neonPow, onCrackle, buzzOn,
 }: {
   filaments: GasRecord;
   splits: GasRecord;
   voltage: GasRecord;
   unlocked: Gas[];
   fingers: number;
+  sparkMites: number;
+  copperSpiders: number;
   toes: number;
   ghosts: number;
   stickmen: number;
@@ -52,9 +55,11 @@ export default function PlasmaBall({
   const holdArcs = useRef<HoldArc[]>([]);
   const fingerSeeds = useRef<Wanderer[]>([]);
   const toeSeeds = useRef<Wanderer[]>([]);
+  const miteSeeds = useRef<Wanderer[]>([]);
+  const spiderSeeds = useRef<Wanderer[]>([]);
   const stickAgents = useRef<StickmanMotion[]>([]);
-  const propsRef = useRef({ filaments, splits, voltage, unlocked, fingers, toes, ghosts, stickmen, crackles });
-  propsRef.current = { filaments, splits, voltage, unlocked, fingers, toes, ghosts, stickmen, crackles };
+  const propsRef = useRef({ filaments, splits, voltage, unlocked, fingers, sparkMites, copperSpiders, toes, ghosts, stickmen, crackles });
+  propsRef.current = { filaments, splits, voltage, unlocked, fingers, sparkMites, copperSpiders, toes, ghosts, stickmen, crackles };
   const neonPowRef = useRef(neonPow);
   neonPowRef.current = neonPow;
   const buzzRef = useRef(buzzOn);
@@ -288,9 +293,11 @@ export default function PlasmaBall({
       const dt = Math.max(0, Math.min((now - last) / 1000, 0.1));
       last = now;
 
-      const { filaments: fil, fingers: fing, toes: toe, ghosts: ghs, stickmen: stm, unlocked: u, crackles: crk } = propsRef.current;
+      const { filaments: fil, fingers: fing, sparkMites: mites, copperSpiders: spiders, toes: toe, ghosts: ghs, stickmen: stm, unlocked: u, crackles: crk } = propsRef.current;
       const visible = visibleHelperCounts({ fingers: fing, toes: toe, ghosts: ghs, stickmen: stm });
       const visibleFingers = visible.fingers;
+      const visibleMites = visibleHelperCount(mites, "mites");
+      const visibleSpiders = visibleHelperCount(spiders, "spiders");
       const visibleToes = visible.toes;
       const visibleGhosts = visible.ghosts;
       const visibleStickmen = visible.stickmen;
@@ -305,7 +312,8 @@ export default function PlasmaBall({
       const activeFlash = flashes.current.length > 0;
 
       // Every purchased helper is drawn. Only costly visual effects are sampled.
-      const effectChance = helperEffectChance({ fingers: fing, toes: toe, ghosts: ghs, stickmen: stm });
+      const effectChance = Math.min(helperEffectChance({ fingers: fing, toes: toe, ghosts: ghs, stickmen: stm }),
+        160 / Math.max(1, fing + mites + spiders + toe + ghs + stm));
       // ---- moving helpers spread across several concentric rings ----
       const runHelpers = (
         seeds: { current: Wanderer[] }, count: number,
@@ -340,6 +348,35 @@ export default function PlasmaBall({
             radius + (kind === "toes" ? beforeStrike : 0),
             contactOrients,
           );
+        }
+      };
+
+      // Mites dart rapidly around the plasma glass; Copper Spiders crawl
+      // more deliberately and pulse when discharging. Every purchased
+      // creature has its own sprite even when costly flashes are sampled.
+      const runNeonCreatures = (
+        seeds: { current: Wanderer[] }, count: number, kind: "mite" | "spider",
+      ) => {
+        while (seeds.current.length < count) seeds.current.push(newWanderer(seeds.current.length, t));
+        if (seeds.current.length > count) seeds.current.length = count;
+        for (let i = 0; i < count; i++) {
+          const w = seeds.current[i];
+          const fast = kind === "mite";
+          const angle = w.base + (fast ? 0.85 : 0.33) * t + Math.sin(t * w.wob + w.phase) * 0.12;
+          const radius = helperOrbitRadius(fast ? "mites" : "spiders", i, R);
+          const cx = CX + Math.cos(angle) * radius;
+          const cy = CY + Math.sin(angle) * radius;
+          let contact = false;
+          if (t >= w.timer) {
+            w.timer = t + PRESS_INTERVAL;
+            contact = true;
+            if (Math.random() < effectChance) {
+              flashes.current.push(newFlash(cx, cy, !fast));
+              ripples.current.push({ x: cx, y: cy, age: 0, color: fast ? "#ff91cb" : "#eab779" });
+            }
+          }
+          const pressed = contact || t - (w.timer - PRESS_INTERVAL) < (fast ? 0.22 : 0.34);
+          drawNeonCreature(ctx, kind, cx, cy, t, i, pressed);
         }
       };
 
@@ -563,6 +600,8 @@ export default function PlasmaBall({
       // Draw every Finger and Toe in full color, including the back-facing ones.
       runHelpers(fingerSeeds, visibleFingers, FINGER_ORIENTS, FINGER_PRESS_ORIENTS, "fingers");
       runHelpers(toeSeeds, visibleToes, FOOT_ORIENTS, FOOT_PRESS_ORIENTS, "toes");
+      runNeonCreatures(miteSeeds, visibleMites, "mite");
+      runNeonCreatures(spiderSeeds, visibleSpiders, "spider");
 
       // Independent roam/jump phases: small walkers circle the whole ball and
       // leap in to hit the glass. Effects are cosmetic; all owned helpers earn.
@@ -617,7 +656,7 @@ export default function PlasmaBall({
       }
 
       // ---- hint on a brand-new dark ball ----
-      if (crk === 0 && !held && fing === 0 && toe === 0 && ghs === 0 && stm === 0) {
+      if (crk === 0 && !held && fing === 0 && mites === 0 && spiders === 0 && toe === 0 && ghs === 0 && stm === 0) {
         ctx.globalAlpha = 0.5 + Math.sin(t * 3) * 0.4;
         drawPixelText(ctx, CX, CY + 20, "PRESS THE BALL", "#ffffff");
         ctx.globalAlpha = 1;

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.28 - Neon creatures, gradual discoveries and Neon Mastery
+
+- Add **Spark Mites** and **Copper Spiders**, two purchasable Neon helpers with their own original three-pose code-drawn pixel art, animated roaming and separate contact effects
+- Spark Mites (power 3, first cost 40 Neon) appear after buying a Finger; Copper Spiders (power 12, first cost 350 Neon) appear after buying a Mite
+- Gradually reveal the next Helper and its Prestige/Stats rows only after the preceding helper is discovered, rather than overwhelming new players with the full list
+- Preserve previously discovered helpers across Prestige and keep already-unlocked gases/helpers accessible in old saves
+- First gas chapter: Argon unlock requires 6,000 Neon produced during the current run, one purchased Copper Spider and 1,800 spendable Neon
+- Add a compact, spend-proof **Neon Mastery** progress bar with a Spider checklist to the Gas tab; all existing unlocked Argon/Xenon/Krypton remains intact
+- Expand the versioned save schema to v18 with non-resetting lifetime records and a one-time unmodified backup of the pre-expansion save
+- Preserve all original helper prices, rates, visuals, Prestige capacity and Voltage migration behavior; later gas chapters remain unchanged
+- Add regression tests for unlock sequence, purchase protection, save migration, Prestige, persistent backup, Mastery conditions, sprites and rendered UI
+
 ## 0.12.27 - Expandable helper catalog foundation
 
 - Create an ordered helper registry defining each existing helper's gas, price curve, unlock, power, visual type, starting capacity, Prestige capacity increment and shop labels

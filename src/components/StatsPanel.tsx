@@ -1,5 +1,5 @@
 import { cracklePower } from "../game/economy";
-import { HELPER_CATALOG, helperOwned } from "../game/helpers";
+import { HELPER_CATALOG, helperOwned, helperVisible } from "../game/helpers";
 import { MAX_VOLT_LEVELS, splitMult, voltMult } from "../game/config";
 import type { Gas, GasRecord, GameState } from "../game/types";
 import { fmt } from "../utils/format";
@@ -46,7 +46,7 @@ export default function StatsPanel({ state, unlockedGases, rates }: {
             lifetime={formatDuration(state.activeSeconds)} />
           <StatCard title="OFFLINE PLAYTIME" value={formatDuration(offlineThisRun)}
             lifetime={formatDuration(state.offlineSeconds)} />
-          {HELPER_CATALOG.map(helper => (
+          {HELPER_CATALOG.filter(helper => helperVisible(state, helper.id)).map(helper => (
             <StatCard key={helper.id} title={helper.statsLabel}
               value={String(helperOwned(state, helper.id))}
               lifetime={String(ls.helperHires[helper.id])}

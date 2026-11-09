@@ -2,10 +2,11 @@
  * The gases that fill the ball: data table plus lookup helpers.
  */
 import type { Gas, GasId } from "./types.ts";
+import { ARGON_MASTER_PRICE } from "./mastery.ts";
 
 export const GAS_LIST: Gas[] = [
   { id: "neon", name: "NEON", color: "#ff5ec8", glow: "#b3238f", core: "#ffd6f2", baseRate: 0.1, cap: 12, unlockCost: {} },
-  { id: "argon", name: "ARGON", color: "#7d7dff", glow: "#3d3dc9", core: "#dfe4ff", baseRate: 0.5, cap: 8, unlockCost: { neon: 600 } },
+  { id: "argon", name: "ARGON", color: "#7d7dff", glow: "#3d3dc9", core: "#dfe4ff", baseRate: 0.5, cap: 8, unlockCost: { neon: ARGON_MASTER_PRICE } },
   { id: "xenon", name: "XENON", color: "#35e0e8", glow: "#0f8fa8", core: "#d8fbff", baseRate: 2.5, cap: 6, unlockCost: { argon: 5000 } },
   { id: "krypton", name: "KRYPTON", color: "#ffd166", glow: "#bb7b00", core: "#fff1c7", baseRate: 8, cap: 4, unlockCost: { xenon: 40000 } },
 ];

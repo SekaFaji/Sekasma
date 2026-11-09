@@ -177,7 +177,9 @@ test("original HELP, GAS and POWER upgrades remain visible", async () => {
   const help = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "help" }));
   const gas = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "gas" }));
   const power = renderToStaticMarkup(React.createElement(UpgradePanel, { ...shared, upTab: "power" }));
-  for (const label of ["FINGER", "BIG TOE", "GHOST HAND", "STICKMAN"]) assert.match(help, new RegExp(label));
+  assert.match(help, /FINGER/);
+  for (const label of ["SPARK MITE", "COPPER SPIDER", "BIG TOE", "GHOST HAND", "STICKMAN"])
+    assert.doesNotMatch(help, new RegExp(label));
   assert.match(gas, /ARGON GAS/);
   for (const label of ["NEON ARC", "NEON VOLTS", "NEON SPLIT"]) assert.match(power, new RegExp(label));
 });
@@ -262,7 +264,7 @@ test("SEKASMA logo is pixel-drawn and keeps the Welcome Back mark reusable", () 
   assert.doesNotMatch(logo, /⚡/);
 });
 
-test("all four helper upgrades are rendered as compact rows on HELP", async () => {
+test("all six discovered helper upgrades are rendered as compact rows on HELP", async () => {
   const { freshSave } = await import("../src/game/save.ts");
   const { GAS_LIST } = await import("../src/game/gases.ts");
   const state = { ...freshSave(), unlocked: GAS_LIST.map(g => g.id), plasma: {
@@ -272,8 +274,8 @@ test("all four helper upgrades are rendered as compact rows on HELP", async () =
     state, unlockedGases: GAS_LIST, accent: "#ffd166", upTab: "help",
     onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {},
   }));
-  assert.equal((html.match(/min-h-\[89px\]/g) ?? []).length, 4);
-  for (const power of [1, 8, 20, 45]) assert.match(html, new RegExp(`POWER ${power} · OWN`));
+  assert.equal((html.match(/min-h-\[89px\]/g) ?? []).length, 6);
+  for (const power of [1, 3, 12, 8, 20, 45]) assert.match(html, new RegExp(`POWER ${power} · OWN`));
   assert.doesNotMatch(html, /× FINGER/);
   const app = renderToStaticMarkup(React.createElement(App));
   assert.match(app, /sekasma-panel-shell/);
@@ -411,7 +413,14 @@ test("Prestige displays permanent caps, rewards and two confirmation stages", as
   const initial = renderToStaticMarkup(React.createElement(PrestigePanel, { state, step: 0, ...callbacks }));
   assert.match(initial, /PERMANENT HELPER CAPACITY/);
   assert.match(initial, /PRESTIGE NOT READY/);
-  for (const name of ["FINGERS", "BIG TOES", "GHOST HANDS", "STICKMEN"]) assert.match(initial, new RegExp(name));
+  assert.match(initial, /FINGERS HIRED/);
+  for (const name of ["SPARK MITES", "COPPER SPIDERS", "BIG TOES", "GHOST HANDS", "STICKMEN"])
+    assert.doesNotMatch(initial, new RegExp(name));
+  const discovered = { ...state, unlocked: ["neon", "argon", "xenon", "krypton"] };
+  const advanced = renderToStaticMarkup(React.createElement(PrestigePanel, {
+    state: discovered, step: 0, ...callbacks,
+  }));
+  for (const name of ["BIG TOES", "GHOST HANDS", "STICKMEN"]) assert.match(advanced, new RegExp(name));
   const stage1 = renderToStaticMarkup(React.createElement(PrestigePanel, { state, step: 1, ...callbacks }));
   const stage2 = renderToStaticMarkup(React.createElement(PrestigePanel, { state, step: 2, ...callbacks }));
   assert.match(stage1, /CONTINUE/);
@@ -661,7 +670,7 @@ test("Stats render a small lifetime value below every run value", async () => {
   assert.match(markup, /PLASMA EARNED/);
   assert.match(markup, /BEST EVER/);
   assert.match(markup, /aria-label="HELP RATE lifetime 3.5\/S"/);
-  assert.equal((markup.match(/class="tabular-nums"/g) ?? []).length >= 14, true);
+  assert.equal((markup.match(/class="tabular-nums"/g) ?? []).length >= 11, true);
 });
 
 test("Stats retain small lifetime values even when Prestige cleared run helpers and upgrades", async () => {
@@ -717,30 +726,91 @@ test("Voltage Stats show current levels and separate old-step lifetime history",
   assert.match(html, /OLD 1500 STEPS/);
 });
 
-test("HELP tab renders each existing helper from the catalog with current lock rules", async () => {
-  const { HELPER_CATALOG } = await server.ssrLoadModule("/src/game/helpers.ts");
+test("HELP rows reveal only after earlier helper purchases and existing saves stay visible", async () => {
+  const { HELPER_CATALOG, helperVisible } = await server.ssrLoadModule("/src/game/helpers.ts");
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const initial = freshSave();
+  const props = { state: initial, unlockedGases: [gasById("neon")], accent: "#ff5ec8",
+    upTab: "help", onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {} };
+  const view = state => renderToStaticMarkup(React.createElement(UpgradePanel, {
+    ...props, state, unlockedGases: state.unlocked.map(gasById),
+  }));
+  assert.equal(HELPER_CATALOG.length, 6);
+  assert.deepEqual(HELPER_CATALOG.filter(h => helperVisible(initial, h.id)).map(h => h.id), ["finger"]);
+  assert.doesNotMatch(view(initial), /SPARK MITE|COPPER SPIDER|BIG TOE/);
+  const withFinger = { ...initial, fingers: 1 };
+  assert.match(view(withFinger), /SPARK MITE/);
+  assert.doesNotMatch(view(withFinger), /COPPER SPIDER/);
+  const withMite = { ...withFinger, sparkMites: 1 };
+  assert.match(view(withMite), /COPPER SPIDER/);
+  assert.doesNotMatch(view(withMite), /BIG TOE/);
+  const withSpider = { ...withMite, copperSpiders: 1 };
+  assert.match(view(withSpider), /BIG TOE/);
+  assert.match(view(withSpider), /UNLOCKS WITH ARGON GAS/);
+  const existing = { ...initial, unlocked: ["neon", "argon", "xenon", "krypton"] };
+  for (const helper of HELPER_CATALOG) assert.match(view(existing), new RegExp(helper.name));
+  assert.doesNotMatch(view(existing), /UNLOCKS WITH /);
+  const afterPrestige = { ...initial, lifetime: { ...initial.lifetime,
+    helperHires: { ...initial.lifetime.helperHires, finger: 5, sparkMite: 2, copperSpider: 1 } } };
+  assert.match(view(afterPrestige), /COPPER SPIDER/);
+  assert.match(view(afterPrestige), /BIG TOE/);
+});
+
+test("Neon Mastery UI describes cumulative run earnings and the Spider requirement", async () => {
   const { freshSave } = await import("../src/game/save.ts");
   const { gasById } = await import("../src/game/gases.ts");
   const state = freshSave();
-  const props = {
-    state, unlockedGases: [gasById("neon")], accent: "#ff5ec8",
-    upTab: "help", onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {},
-  };
+  state.plasma.neon = 200000;
+  state.total.neon = 3000;
+  const props = { state, unlockedGases: [gasById("neon")], accent: "#ff5ec8",
+    upTab: "gas", onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {} };
   const html = renderToStaticMarkup(React.createElement(UpgradePanel, props));
-  assert.equal(HELPER_CATALOG.length, 4);
-  for (const helper of HELPER_CATALOG) assert.match(html, new RegExp(helper.name));
-  // Each locked helper appears once in visible text and once in its accessible title.
-  assert.equal((html.match(/UNLOCKS WITH /g) ?? []).length, 6);
-  assert.match(html, /POWER 1 · OWN 0\/30/);
-  assert.match(html, /UNLOCKS WITH ARGON GAS/);
-  assert.match(html, /UNLOCKS WITH XENON GAS/);
-  assert.match(html, /UNLOCKS WITH KRYPTON GAS/);
-  const unlocked = { ...state, unlocked: ["neon", "argon", "xenon", "krypton"] };
-  const all = renderToStaticMarkup(React.createElement(UpgradePanel, {
-    ...props, state: unlocked, unlockedGases: unlocked.unlocked.map(gasById),
+  assert.match(html, /NEON MASTERY/);
+  assert.match(html, /aria-label="Neon Mastery progress"/);
+  assert.match(html, /aria-valuenow="50"/);
+  assert.match(html, /DISCOVER MORE NEON HELPERS TO ADVANCE/);
+  assert.doesNotMatch(html, /BUY A COPPER SPIDER TO COMPLETE MASTERY/);
+  assert.match(html, /REQUIRES NEON MASTERY/);
+  assert.match(html, /disabled=""/);
+  const ready = { ...state, copperSpiders: 1, total: { ...state.total, neon: 6000 } };
+  const complete = renderToStaticMarkup(React.createElement(UpgradePanel, {
+    ...props, state: ready,
   }));
-  assert.doesNotMatch(all, /UNLOCKS WITH /);
-  assert.match(all, /POWER 8 · OWN 0\/25/);
-  assert.match(all, /POWER 20 · OWN 0\/20/);
-  assert.match(all, /POWER 45 · OWN 0\/15/);
+  assert.match(complete, /ARGON DISCOVERY AVAILABLE/);
+  assert.match(complete, /aria-valuenow="100"/);
+  assert.match(complete, /NEW CURRENCY/);
+});
+
+test("Neon sprites are available as full-color icons, without emoji or image assets", async () => {
+  const { freshSave } = await import("../src/game/save.ts");
+  const { gasById } = await import("../src/game/gases.ts");
+  const state = { ...freshSave(), fingers: 1, sparkMites: 1 };
+  const html = renderToStaticMarkup(React.createElement(UpgradePanel, {
+    state, unlockedGases: [gasById("neon")], accent: "#ff5ec8", upTab: "help",
+    onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {},
+  }));
+  assert.match(html, /SPARK MITE/);
+  assert.match(html, /COPPER SPIDER/);
+  assert.match(html, /<canvas/);
+});
+
+test("Neon pixel-art atlas has three distinct detailed poses per helper", async () => {
+  const art = await server.ssrLoadModule("/src/render/neonCreatures.ts");
+  for (const [frames, palette, width, height] of [
+    [art.SPARK_MITE_FRAMES, art.MITE_PALETTE, 13, 13],
+    [art.COPPER_SPIDER_FRAMES, art.SPIDER_PALETTE, 17, 15],
+  ]) {
+    assert.equal(frames.length, 3);
+    const variants = new Set();
+    for (const sprite of frames) {
+      assert.equal(sprite.length, height);
+      assert.ok(sprite.every(row => row.length === width));
+      assert.ok(sprite.join("").includes("5"), "bright eyes visible");
+      for (const pixel of sprite.join(""))
+        assert.ok(pixel === "." || palette[pixel], `unknown sprite pixel ${pixel}`);
+      variants.add(sprite.join("|"));
+    }
+    assert.equal(variants.size, 3, "walk A, walk B and discharge must differ");
+  }
 });

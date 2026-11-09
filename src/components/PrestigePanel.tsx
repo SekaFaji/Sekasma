@@ -4,10 +4,8 @@ import {
   capacityUpgradeCost, helperCapacity, prestigeReward, runPrestigeScore,
 } from "../game/prestige";
 import { fmt } from "../utils/format";
+import { helperDefinition, helperVisible, helperOwned } from "../game/helpers";
 
-const HELPER_NAMES: Record<HelperId, string> = {
-  finger: "FINGERS", toe: "BIG TOES", ghost: "GHOST HANDS", stickman: "STICKMEN",
-};
 export type PrestigeConfirmStep = 0 | 1 | 2;
 
 export default function PrestigePanel({ state, step, onStart, onNext, onCancel, onConfirm, onBuyCapacity }: {
@@ -41,14 +39,14 @@ export default function PrestigePanel({ state, step, onStart, onNext, onCancel, 
       <section aria-label="Permanent helper capacity" className="border border-white/15 bg-[#120c27] p-2">
         <h3 className="mb-1.5 font-bold tracking-widest text-[#d4b6ff]">PERMANENT HELPER CAPACITY</h3>
         <p className="mb-2 text-[10px] text-white/60">UPGRADES COST SPARKS AND SURVIVE EVERY PRESTIGE.</p>
-        {HELPERS.map(kind => {
+        {HELPERS.filter(kind => helperVisible(state, kind) || helperOwned(state, kind) > 0).map(kind => {
           const cost = capacityUpgradeCost(state, kind);
           const capacity = helperCapacity(state, kind);
           const canBuy = state.prestige.sparks >= cost;
           return (
             <div key={kind} className="mb-1.5 flex min-h-[46px] items-center gap-2 border border-white/15 bg-[#1b1233] px-2 py-1">
               <div className="min-w-0 flex-1">
-                <div className="font-bold text-white">{HELPER_NAMES[kind]}</div>
+                <div className="font-bold text-white">{helperDefinition(kind).statsLabel}</div>
                 <div className="text-[10px] text-white/70">
                   CAP {capacity} · NEXT +{CAPACITY_STEP[kind]}
                 </div>
@@ -57,7 +55,7 @@ export default function PrestigePanel({ state, step, onStart, onNext, onCancel, 
                 </div>
               </div>
               <button type="button" onClick={() => onBuyCapacity(kind)} disabled={!canBuy}
-                aria-label={`Increase ${HELPER_NAMES[kind]} capacity by ${CAPACITY_STEP[kind]} for ${cost} Sparks`}
+                aria-label={`Increase ${helperDefinition(kind).statsLabel} capacity by ${CAPACITY_STEP[kind]} for ${cost} Sparks`}
                 className="h-[40px] w-[85px] shrink-0 border border-[#af80e2] bg-[#3b215c] px-1 font-bold text-white disabled:border-white/20 disabled:bg-[#151027] disabled:text-white/40">
                 +{CAPACITY_STEP[kind]} <span className="block text-[9px]">{cost} SPARKS</span>
               </button>

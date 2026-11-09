@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { accrueIdle, accrueOffline, bulkCost, cappedOfflineSeconds, fingerCost, purchaseUpgrade } from "../src/game/economy.ts";
 import { OFFLINE_CAP_S, HELPER_POWER, PRESS_INTERVAL, MAX_VOLT_LEVELS, VOLT_LEVEL_BONUS, voltMult } from "../src/game/config.ts";
-import { BACKUP_KEY, PRE_VOLTAGE_BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
+import { BACKUP_KEY, PRE_VOLTAGE_BACKUP_KEY, PRE_HELPER_BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
 import { measureTick } from "../src/game/timing.ts";
 import { visibleHelperCount, visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../src/render/limits.ts";
 import { advanceStickman, createStickman } from "../src/render/stickmen.ts";
@@ -55,7 +55,8 @@ test("unaffordable purchases return the exact original state", () => {
 });
 
 test("gas unlock costs are charged once", () => {
-  const initial = { ...freshSave(), plasma: { neon: 600, argon: 0, xenon: 0, krypton: 0 } };
+  const initial = { ...freshSave(), plasma: { neon: 1800, argon: 0, xenon: 0, krypton: 0 },
+    total: { neon: 6000, argon: 0, xenon: 0, krypton: 0 }, copperSpiders: 1 };
   const { state, count } = purchaseUpgrade(initial, "gas", undefined, 100);
   assert.equal(count, 1);
   assert.deepEqual(state.unlocked, ["neon", "argon"]);
@@ -325,13 +326,14 @@ test("all finger, toe, and stickman orbit rings fit inside the canvas without to
 });
 
 test("Prestige capacity starts independent for every helper", () => {
-  assert.deepEqual(BASE_CAPACITY, { finger: 30, toe: 25, ghost: 20, stickman: 15 });
-  assert.deepEqual(CAPACITY_STEP, { finger: 10, toe: 5, ghost: 5, stickman: 3 });
+  assert.deepEqual(BASE_CAPACITY, { finger: 30, sparkMite: 35, copperSpider: 20, toe: 25, ghost: 20, stickman: 15 });
+  assert.deepEqual(CAPACITY_STEP, { finger: 10, sparkMite: 10, copperSpider: 5, toe: 5, ghost: 5, stickman: 3 });
   const s = freshSave();
-  assert.deepEqual(s.prestige.capacityLevels, { finger: 0, toe: 0, ghost: 0, stickman: 0 });
-  for (const kind of ["finger", "toe", "ghost", "stickman"])
+  assert.deepEqual(s.prestige.capacityLevels, { finger: 0, sparkMite: 0, copperSpider: 0, toe: 0, ghost: 0, stickman: 0 });
+  for (const kind of ["finger", "sparkMite", "copperSpider", "toe", "ghost", "stickman"])
     assert.equal(helperCapacity(s, kind), BASE_CAPACITY[kind]);
-  const wealthy = { ...s, plasma: { neon: 1e30, argon: 1e30, xenon: 1e30, krypton: 1e30 } };
+  const wealthy = { ...s, plasma: { neon: 1e30, argon: 1e30, xenon: 1e30, krypton: 1e30 },
+    unlocked: ["neon", "argon", "xenon", "krypton"] };
   assert.equal(bulkCost(wealthy, "finger", undefined, 1000).count, BASE_CAPACITY.finger);
   assert.equal(bulkCost(wealthy, "toe", undefined, 1000).count, BASE_CAPACITY.toe);
 });
@@ -565,7 +567,7 @@ test("v17 lifetime history survives real save and reload without resetting save 
   s = purchaseUpgrade(s, "finger", undefined, 2).state;
   assert.equal(persist(s), true);
   const stored = JSON.parse(items.get(SAVE_KEY));
-  assert.equal(stored.v, 17);
+  assert.equal(stored.v, 18);
   assert.equal(loadSave().lifetime.helperHires.finger, 2);
   assert.equal(loadSave().fingers, 2);
   assert.equal(loadSave().lifetime.peakHelpRate.neon, s.lifetime.peakHelpRate.neon);
@@ -655,7 +657,7 @@ test("first legacy Voltage load stores an untouched snapshot through later autos
   assert.equal(persist({ ...migrated, fingers: 3 }), true);
   assert.equal(loadSave().legacyVoltage.neon, 1234);
   assert.equal(items.get(PRE_VOLTAGE_BACKUP_KEY), raw);
-  assert.equal(JSON.parse(items.get(SAVE_KEY)).v, 17);
+  assert.equal(JSON.parse(items.get(SAVE_KEY)).v, 18);
   resetSave();
   assert.equal(items.has(PRE_VOLTAGE_BACKUP_KEY), false);
 }));
@@ -676,8 +678,8 @@ test("helper catalog preserves v0.12.26 prices at early and mixed-currency thres
     helperUnlocked, isHelperId } = await import("../src/game/helpers.ts");
   const { fingerCost, toeCost, ghostCost, stickmanCost, buyMsg } = await import("../src/game/economy.ts");
   const { GAS_LIST } = await import("../src/game/gases.ts");
-  assert.deepEqual(HELPER_IDS, ["finger", "toe", "ghost", "stickman"]);
-  assert.deepEqual(HELPER_CATALOG.map(h => h.nativeGas), GAS_LIST.map(g => g.id));
+  assert.deepEqual(HELPER_IDS, ["finger", "sparkMite", "copperSpider", "toe", "ghost", "stickman"]);
+  assert.deepEqual(HELPER_CATALOG.filter(h => ["finger", "toe", "ghost", "stickman"].includes(h.id)).map(h => h.nativeGas), GAS_LIST.map(g => g.id));
   const gasSets = [
     ["neon"],
     ["neon", "argon"],
@@ -702,9 +704,9 @@ test("helper catalog preserves v0.12.26 prices at early and mixed-currency thres
       assert.deepEqual(stickmanCost(n), { krypton: Math.ceil(120 * 1.5 ** n) });
     }
   }
-  assert.deepEqual(HELPER_CATALOG.map(h => h.power), [1, 8, 20, 45]);
-  assert.deepEqual(HELPER_CATALOG.map(h => h.baseCapacity), [30, 25, 20, 15]);
-  assert.deepEqual(HELPER_CATALOG.map(h => h.capacityStep), [10, 5, 5, 3]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.power), [1, 3, 12, 8, 20, 45]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.baseCapacity), [30, 35, 20, 25, 20, 15]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.capacityStep), [10, 10, 5, 5, 5, 3]);
   assert.deepEqual([1, 2].map(n => buyMsg("finger", undefined, n)),
     ["+1 FINGER HIRED", "+2 FINGERS HIRED"]);
   assert.deepEqual([1, 2].map(n => buyMsg("toe", undefined, n)),
@@ -756,3 +758,142 @@ test("catalog purchase and Prestige retain exact save fields, balances and lifet
   assert.deepEqual(reloaded.lifetime.helperHires, current.lifetime.helperHires);
   assert.equal(reloaded.voltage.neon, 0);
 });
+
+test("Neon helpers unlock in sequence, cannot be purchased early, and retain old helper rates", async () => {
+  const { helperCost, helperVisible, helperUnlocked } = await import("../src/game/helpers.ts");
+  const s = freshSave();
+  s.plasma.neon = 1e7;
+  assert.equal(helperVisible(s, "sparkMite"), false);
+  assert.equal(helperVisible(s, "copperSpider"), false);
+  assert.equal(bulkCost(s, "sparkMite", undefined, 1).count, 0);
+  assert.equal(bulkCost(s, "copperSpider", undefined, 1).count, 0);
+  assert.deepEqual(helperCost("sparkMite", 0, ["neon"]), { neon: 40 });
+  assert.deepEqual(helperCost("sparkMite", 1, ["neon"]), { neon: 52 });
+  assert.deepEqual(helperCost("copperSpider", 0, ["neon"]), { neon: 350 });
+  assert.deepEqual(helperCost("copperSpider", 1, ["neon"]), { neon: 483 });
+  let a = purchaseUpgrade(s, "finger", undefined, 1).state;
+  assert.equal(helperUnlocked(a, "sparkMite"), true);
+  assert.equal(helperVisible(a, "copperSpider"), false);
+  a = purchaseUpgrade(a, "sparkMite", undefined, 2).state;
+  assert.equal(a.sparkMites, 2);
+  assert.equal(a.lifetime.helperHires.sparkMite, 2);
+  assert.equal(helperUnlocked(a, "copperSpider"), true);
+  a = purchaseUpgrade(a, "copperSpider", undefined, 1).state;
+  assert.equal(a.copperSpiders, 1);
+  assert.equal(a.lifetime.helperHires.copperSpider, 1);
+  assert.ok(Math.abs(idleRate(a).neon -
+    (1 + 2 * 3 + 12) * 0.1 / PRESS_INTERVAL) < 1e-10);
+  assert.equal(s.fingers, 0);
+  assert.equal(s.sparkMites, 0);
+  assert.equal(s.copperSpiders, 0);
+});
+
+test("Neon Mastery depends on lifetime-earned Neon this run and one purchased Spider", async () => {
+  const { NEON_MASTERY_REQUIRED, ARGON_MASTER_PRICE, neonProducedThisRun, neonChapterComplete,
+    neonMasteryProgress } = await import("../src/game/mastery.ts");
+  assert.equal(NEON_MASTERY_REQUIRED, 6000);
+  assert.equal(ARGON_MASTER_PRICE, 1800);
+  const s = freshSave();
+  s.plasma.neon = 1e7;
+  assert.equal(bulkCost(s, "gas", undefined, 1).count, 0, "currency alone does not bypass Mastery");
+  assert.equal(neonMasteryProgress(s), 0);
+  s.total.neon = 6000;
+  assert.equal(neonMasteryProgress(s), 100);
+  assert.equal(neonChapterComplete(s), false, "Spider required");
+  let current = purchaseUpgrade(s, "finger", undefined, 1).state;
+  current = purchaseUpgrade(current, "sparkMite", undefined, 1).state;
+  current = purchaseUpgrade(current, "copperSpider", undefined, 1).state;
+  assert.equal(neonChapterComplete(current), true);
+  assert.equal(bulkCost(current, "gas", undefined, 1).count, 1);
+  assert.equal(bulkCost(current, "gas", undefined, 1).cost.neon, 1800);
+  assert.equal(neonProducedThisRun(current), 6000);
+  const gas = purchaseUpgrade(current, "gas", undefined, 1);
+  assert.equal(gas.state.unlocked.includes("argon"), true);
+  assert.equal(gas.state.plasma.neon, current.plasma.neon - 1800);
+  assert.equal(s.unlocked.length, 1);
+  const spent = { ...current, plasma: { ...current.plasma, neon: 1800 } };
+  assert.equal(neonMasteryProgress(spent), 100, "spending must not reduce Mastery");
+  const nextRun = { ...current, prestige: { ...current.prestige,
+    lastTotal: { ...current.prestige.lastTotal, neon: 1500 } } };
+  assert.equal(neonProducedThisRun(nextRun), 4500);
+  assert.equal(bulkCost(nextRun, "gas", undefined, 1).count, 0);
+});
+
+test("v17 migration retains existing plasma, gases, power and legacy helper records", () => {
+  const old = freshSave();
+  old.plasma = { neon: 1234, argon: 567, xenon: 89, krypton: 1 };
+  old.unlocked = ["neon", "argon", "xenon"];
+  old.total.neon = 12000;
+  old.fingers = 8;
+  old.toes = 3;
+  old.voltage.neon = 4;
+  old.prestige.capacityLevels.finger = 2;
+  old.lifetime.helperHires.finger = 48;
+  const { sparkMites, copperSpiders, ...legacy } = old;
+  void sparkMites; void copperSpiders;
+  const saved = { ...legacy, v: 17, prestige: { ...legacy.prestige,
+    capacityLevels: { finger: 2, toe: 0, ghost: 0, stickman: 0 },
+    legacyCapacity: { finger: 30, toe: 25, ghost: 20, stickman: 15 } },
+    lifetime: { ...legacy.lifetime,
+      helperHires: { finger: 48, toe: 3, ghost: 0, stickman: 0 } },
+  };
+  const restored = migrateSave(saved);
+  assert.deepEqual(restored.plasma, old.plasma);
+  assert.deepEqual(restored.unlocked, old.unlocked);
+  assert.equal(restored.fingers, 8);
+  assert.equal(restored.toes, 3);
+  assert.equal(restored.sparkMites, 0);
+  assert.equal(restored.copperSpiders, 0);
+  assert.equal(restored.lifetime.helperHires.finger, 48);
+  assert.equal(restored.lifetime.helperHires.sparkMite, 0);
+  assert.equal(restored.prestige.capacityLevels.finger, 2);
+  assert.equal(restored.voltage.neon, 4);
+  assert.ok(Math.abs(idleRate(restored).neon -
+    (8 + 3 * 8) * 0.1 * (1 + restored.voltage.neon * 0.1) / PRESS_INTERVAL) < 1e-10);
+});
+
+test("v18 saves preserve both Neon helper counts, lifetime hires and Prestige reset", () => {
+  const s = freshSave();
+  s.unlocked = ["neon", "argon", "xenon", "krypton"];
+  s.total.krypton = 3000;
+  s.total.neon = 100000;
+  s.plasma.neon = 1e7;
+  s.fingers = 1;
+  s.sparkMites = 3;
+  s.copperSpiders = 2;
+  s.lifetime.helperHires.sparkMite = 7;
+  s.lifetime.helperHires.copperSpider = 4;
+  const restored = migrateSave({ ...s, v: 18 });
+  assert.equal(restored.sparkMites, 3);
+  assert.equal(restored.copperSpiders, 2);
+  assert.equal(restored.lifetime.helperHires.sparkMite, 7);
+  assert.equal(restored.lifetime.helperHires.copperSpider, 4);
+  const reset = performPrestige(restored);
+  assert.equal(reset.sparkMites, 0);
+  assert.equal(reset.copperSpiders, 0);
+  assert.equal(reset.lifetime.helperHires.sparkMite, 7);
+  assert.equal(reset.lifetime.helperHires.copperSpider, 4);
+  assert.equal(reset.unlocked.length, 1);
+  assert.ok(reset.prestige.cycles > 0);
+});
+
+
+
+test("old helper save has a protected original snapshot through repeated autosaves", () => withStorage((items) => {
+  const old = freshSave();
+  const raw = JSON.stringify({ ...old, fingers: 7, v: 17 });
+  items.set(SAVE_KEY, raw);
+  const migrated = loadSave();
+  assert.equal(migrated.fingers, 7);
+  assert.equal(migrated.sparkMites, 0);
+  assert.equal(migrated.copperSpiders, 0);
+  assert.equal(items.get(PRE_HELPER_BACKUP_KEY), raw);
+  assert.equal(persist(migrated), true);
+  assert.equal(persist({ ...migrated, fingers: 9 }), true);
+  assert.equal(items.get(PRE_HELPER_BACKUP_KEY), raw);
+  const current = JSON.parse(items.get(SAVE_KEY));
+  assert.equal(current.v, 18);
+  assert.equal(loadSave().fingers, 9);
+  resetSave();
+  assert.equal(items.has(PRE_HELPER_BACKUP_KEY), false);
+}));
