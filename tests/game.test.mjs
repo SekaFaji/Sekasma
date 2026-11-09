@@ -676,8 +676,8 @@ test("helper catalog preserves v0.12.26 prices at early and mixed-currency thres
     helperUnlocked, isHelperId } = await import("../src/game/helpers.ts");
   const { fingerCost, toeCost, ghostCost, stickmanCost, buyMsg } = await import("../src/game/economy.ts");
   const { GAS_LIST } = await import("../src/game/gases.ts");
-  assert.deepEqual(HELPER_IDS, ["finger", "toe", "ghost", "stickman"]);
-  assert.deepEqual(HELPER_CATALOG.map(h => h.nativeGas), GAS_LIST.map(g => g.id));
+  assert.deepEqual(HELPER_IDS, ["finger", "sparkMite", "copperSpider", "toe", "ghost", "stickman"]);
+  assert.deepEqual(HELPER_CATALOG.filter(h => ["finger", "toe", "ghost", "stickman"].includes(h.id)).map(h => h.nativeGas), GAS_LIST.map(g => g.id));
   const gasSets = [
     ["neon"],
     ["neon", "argon"],
@@ -702,9 +702,9 @@ test("helper catalog preserves v0.12.26 prices at early and mixed-currency thres
       assert.deepEqual(stickmanCost(n), { krypton: Math.ceil(120 * 1.5 ** n) });
     }
   }
-  assert.deepEqual(HELPER_CATALOG.map(h => h.power), [1, 8, 20, 45]);
-  assert.deepEqual(HELPER_CATALOG.map(h => h.baseCapacity), [30, 25, 20, 15]);
-  assert.deepEqual(HELPER_CATALOG.map(h => h.capacityStep), [10, 5, 5, 3]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.power), [1, 3, 12, 8, 20, 45]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.baseCapacity), [30, 35, 20, 25, 20, 15]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.capacityStep), [10, 10, 5, 5, 5, 3]);
   assert.deepEqual([1, 2].map(n => buyMsg("finger", undefined, n)),
     ["+1 FINGER HIRED", "+2 FINGERS HIRED"]);
   assert.deepEqual([1, 2].map(n => buyMsg("toe", undefined, n)),
