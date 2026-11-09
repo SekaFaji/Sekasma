@@ -264,7 +264,7 @@ test("SEKASMA logo is pixel-drawn and keeps the Welcome Back mark reusable", () 
   assert.doesNotMatch(logo, /⚡/);
 });
 
-test("all six discovered helper upgrades are rendered as compact rows on HELP", async () => {
+test("all eight discovered helper upgrades are rendered as compact rows on HELP", async () => {
   const { freshSave } = await import("../src/game/save.ts");
   const { GAS_LIST } = await import("../src/game/gases.ts");
   const state = { ...freshSave(), unlocked: GAS_LIST.map(g => g.id), plasma: {
@@ -274,8 +274,8 @@ test("all six discovered helper upgrades are rendered as compact rows on HELP", 
     state, unlockedGases: GAS_LIST, accent: "#ffd166", upTab: "help",
     onUpTabChange() {}, quantities: {}, onQuantityChange() {}, onBuy() {},
   }));
-  assert.equal((html.match(/min-h-\[89px\]/g) ?? []).length, 6);
-  for (const power of [1, 3, 12, 8, 20, 45]) assert.match(html, new RegExp(`POWER ${power} · OWN`));
+  assert.equal((html.match(/min-h-\[89px\]/g) ?? []).length, 8);
+  for (const power of [1, 3, 12, 8, 18, 50, 20, 45]) assert.match(html, new RegExp(`POWER ${power} · OWN`));
   assert.doesNotMatch(html, /× FINGER/);
   const app = renderToStaticMarkup(React.createElement(App));
   assert.match(app, /sekasma-panel-shell/);
@@ -736,7 +736,7 @@ test("HELP rows reveal only after earlier helper purchases and existing saves st
   const view = state => renderToStaticMarkup(React.createElement(UpgradePanel, {
     ...props, state, unlockedGases: state.unlocked.map(gasById),
   }));
-  assert.equal(HELPER_CATALOG.length, 6);
+  assert.equal(HELPER_CATALOG.length, 8);
   assert.deepEqual(HELPER_CATALOG.filter(h => helperVisible(initial, h.id)).map(h => h.id), ["finger"]);
   assert.doesNotMatch(view(initial), /SPARK MITE|COPPER SPIDER|BIG TOE/);
   const withFinger = { ...initial, fingers: 1 };
