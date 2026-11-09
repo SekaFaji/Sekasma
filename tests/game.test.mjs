@@ -911,4 +911,4 @@ test("old helper save has a protected original snapshot through repeated autosav
   assert.equal(loadSave().fingers, 9);
   resetSave();
   assert.equal(items.has(PRE_HELPER_BACKUP_KEY), false);
-});
+}));
