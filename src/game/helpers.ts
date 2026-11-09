@@ -8,8 +8,8 @@
 import { HELPER_POWER, MIX_LV } from "./config.ts";
 import type { GasId, GameState, HelperId, HelperRecord } from "./types.ts";
 
-export type HelperSaveField = "fingers" | "sparkMites" | "copperSpiders" | "toes" | "ghosts" | "stickmen";
-export type HelperVisual = "finger" | "mite" | "spider" | "toe" | "ghost" | "stickman";
+export type HelperSaveField = "fingers" | "sparkMites" | "copperSpiders" | "toes" | "conductivePalms" | "orbitDrones" | "ghosts" | "stickmen";
+export type HelperVisual = "finger" | "mite" | "spider" | "toe" | "palm" | "drone" | "ghost" | "stickman";
 export type HelperPriceComponent = {
   gas: GasId;
   base: number;
@@ -26,6 +26,8 @@ export type HelperDefinition = {
   nativeGas: GasId;
   /** Reveal the next helper after one of this type has been purchased. */
   revealAfter?: HelperId;
+  /** Preserve higher-gas players who completed this chapter in older releases. */
+  revealWhenGas?: GasId;
   saveField: HelperSaveField;
   visual: HelperVisual;
   power: number;
@@ -86,9 +88,27 @@ export const HELPER_CATALOG: readonly HelperDefinition[] = [
     ],
   },
   {
+    id: "conductivePalm", name: "CONDUCTIVE PALM", statsLabel: "CONDUCTIVE PALMS",
+    hiredOne: "CONDUCTIVE PALM", hiredMany: "CONDUCTIVE PALMS",
+    nativeGas: "argon", revealAfter: "toe", revealWhenGas: "xenon",
+    saveField: "conductivePalms", visual: "palm",
+    power: HELPER_POWER.conductivePalm, baseCapacity: 25, capacityStep: 5,
+    shopColor: "#a69bff", iconPixelScale: 2,
+    prices: [{ gas: "argon", base: 220, growth: 1.30 }],
+  },
+  {
+    id: "orbitDrone", name: "ORBIT DRONE", statsLabel: "ORBIT DRONES",
+    hiredOne: "ORBIT DRONE", hiredMany: "ORBIT DRONES",
+    nativeGas: "argon", revealAfter: "conductivePalm", revealWhenGas: "xenon",
+    saveField: "orbitDrones", visual: "drone",
+    power: HELPER_POWER.orbitDrone, baseCapacity: 18, capacityStep: 4,
+    shopColor: "#9fb8ff", iconPixelScale: 2,
+    prices: [{ gas: "argon", base: 2200, growth: 1.4 }],
+  },
+  {
     id: "ghost", name: "GHOST HAND", statsLabel: "GHOST HANDS",
     hiredOne: "GHOST HAND", hiredMany: "GHOST HANDS",
-    nativeGas: "xenon", revealAfter: "toe", saveField: "ghosts", visual: "ghost",
+    nativeGas: "xenon", revealAfter: "orbitDrone", saveField: "ghosts", visual: "ghost",
     power: HELPER_POWER.ghost, baseCapacity: 20, capacityStep: 5,
     shopColor: "#b7b2ff", iconPixelScale: 3,
     prices: [{ gas: "xenon", base: 80, growth: 1.45 }],
@@ -124,6 +144,7 @@ export function helperVisible(state: GameState, id: HelperId): boolean {
   return helperOwned(state, id) > 0 ||
     helperOwned(state, helper.revealAfter) > 0 ||
     (state.lifetime?.helperHires?.[helper.revealAfter] ?? 0) > 0 ||
+    (helper.revealWhenGas !== undefined && state.unlocked.includes(helper.revealWhenGas)) ||
     (helper.nativeGas !== "neon" && state.unlocked.includes(helper.nativeGas)) ||
     (helper.nativeGas === "neon" && state.unlocked.includes("argon"));
 }
