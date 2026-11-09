@@ -25,11 +25,12 @@ import { visibleHelperCount, visibleHelperCounts, helperOrbitRadius, helperEffec
 import { advanceStickman, createStickman, type StickmanMotion } from "../render/stickmen";
 import { drawStickman } from "../render/stickmanArt";
 import { drawNeonCreature } from "../render/neonCreatures";
+import { drawArgonCreature } from "../render/argonCreatures";
 import type { Ripple, FloatText, Flash, HoldArc, Wanderer } from "../render/plasma";
 import type { Gas, GasRecord } from "../game/types";
 
 export default function PlasmaBall({
-  filaments, splits, voltage, unlocked, fingers, sparkMites, copperSpiders, toes, ghosts, stickmen, crackles, neonPow, onCrackle, buzzOn,
+  filaments, splits, voltage, unlocked, fingers, sparkMites, copperSpiders, toes, conductivePalms, orbitDrones, ghosts, stickmen, crackles, neonPow, onCrackle, buzzOn,
 }: {
   filaments: GasRecord;
   splits: GasRecord;
@@ -39,6 +40,8 @@ export default function PlasmaBall({
   sparkMites: number;
   copperSpiders: number;
   toes: number;
+  conductivePalms: number;
+  orbitDrones: number;
   ghosts: number;
   stickmen: number;
   crackles: number;
@@ -57,9 +60,11 @@ export default function PlasmaBall({
   const toeSeeds = useRef<Wanderer[]>([]);
   const miteSeeds = useRef<Wanderer[]>([]);
   const spiderSeeds = useRef<Wanderer[]>([]);
+  const palmSeeds = useRef<Wanderer[]>([]);
+  const droneSeeds = useRef<Wanderer[]>([]);
   const stickAgents = useRef<StickmanMotion[]>([]);
-  const propsRef = useRef({ filaments, splits, voltage, unlocked, fingers, sparkMites, copperSpiders, toes, ghosts, stickmen, crackles });
-  propsRef.current = { filaments, splits, voltage, unlocked, fingers, sparkMites, copperSpiders, toes, ghosts, stickmen, crackles };
+  const propsRef = useRef({ filaments, splits, voltage, unlocked, fingers, sparkMites, copperSpiders, toes, conductivePalms, orbitDrones, ghosts, stickmen, crackles });
+  propsRef.current = { filaments, splits, voltage, unlocked, fingers, sparkMites, copperSpiders, toes, conductivePalms, orbitDrones, ghosts, stickmen, crackles };
   const neonPowRef = useRef(neonPow);
   neonPowRef.current = neonPow;
   const buzzRef = useRef(buzzOn);
@@ -293,12 +298,14 @@ export default function PlasmaBall({
       const dt = Math.max(0, Math.min((now - last) / 1000, 0.1));
       last = now;
 
-      const { filaments: fil, fingers: fing, sparkMites: mites, copperSpiders: spiders, toes: toe, ghosts: ghs, stickmen: stm, unlocked: u, crackles: crk } = propsRef.current;
+      const { filaments: fil, fingers: fing, sparkMites: mites, copperSpiders: spiders, toes: toe, conductivePalms: palms, orbitDrones: drones, ghosts: ghs, stickmen: stm, unlocked: u, crackles: crk } = propsRef.current;
       const visible = visibleHelperCounts({ fingers: fing, toes: toe, ghosts: ghs, stickmen: stm });
       const visibleFingers = visible.fingers;
       const visibleMites = visibleHelperCount(mites, "mites");
       const visibleSpiders = visibleHelperCount(spiders, "spiders");
       const visibleToes = visible.toes;
+      const visiblePalms = visibleHelperCount(palms, "palms");
+      const visibleDrones = visibleHelperCount(drones, "drones");
       const visibleGhosts = visible.ghosts;
       const visibleStickmen = visible.stickmen;
       const sig = u.map((g) => g.id).join(",");
@@ -313,7 +320,7 @@ export default function PlasmaBall({
 
       // Every purchased helper is drawn. Only costly visual effects are sampled.
       const effectChance = Math.min(helperEffectChance({ fingers: fing, toes: toe, ghosts: ghs, stickmen: stm }),
-        160 / Math.max(1, fing + mites + spiders + toe + ghs + stm));
+        160 / Math.max(1, fing + mites + spiders + toe + palms + drones + ghs + stm));
       // ---- moving helpers spread across several concentric rings ----
       const runHelpers = (
         seeds: { current: Wanderer[] }, count: number,
@@ -377,6 +384,37 @@ export default function PlasmaBall({
           }
           const pressed = contact || t - (w.timer - PRESS_INTERVAL) < (fast ? 0.22 : 0.34);
           drawNeonCreature(ctx, kind, cx, cy, t, i, pressed);
+        }
+      };
+
+      // Argon gloves press into the rim and drones patrol an outer ring.
+      // Every owned helper is drawn; expensive strike effects are sampled.
+      const runArgonHelpers = (
+        seeds: { current: Wanderer[] }, count: number, kind: "palm" | "drone",
+      ) => {
+        while (seeds.current.length < count)
+          seeds.current.push(newWanderer(seeds.current.length, t));
+        if (seeds.current.length > count) seeds.current.length = count;
+        const isDrone = kind === "drone";
+        for (let i = 0; i < count; i++) {
+          const w = seeds.current[i];
+          const angle = w.base + (isDrone ? 0.42 : -0.12) * t
+            + Math.sin(t * w.wob + w.phase) * (isDrone ? 0.08 : 0.17);
+          const radius = helperOrbitRadius(isDrone ? "drones" : "palms", i, R);
+          const x = Math.round(CX + Math.cos(angle) * radius);
+          const y = Math.round(CY + Math.sin(angle) * radius);
+          if (t >= w.timer) {
+            w.timer = t + PRESS_INTERVAL;
+            if (Math.random() < effectChance) {
+              const targetX = Math.round(CX + Math.cos(angle) * (R - 4));
+              const targetY = Math.round(CY + Math.sin(angle) * (R - 4));
+              flashes.current.push(newFlash(targetX, targetY, isDrone));
+              ripples.current.push({ x: targetX, y: targetY, age: 0,
+                color: isDrone ? "#8bbdff" : "#a89af9" });
+            }
+          }
+          const striking = t - (w.timer - PRESS_INTERVAL) < (isDrone ? 0.21 : 0.36);
+          drawArgonCreature(ctx, kind, x, y, t, i, striking);
         }
       };
 
@@ -602,6 +640,8 @@ export default function PlasmaBall({
       runHelpers(toeSeeds, visibleToes, FOOT_ORIENTS, FOOT_PRESS_ORIENTS, "toes");
       runNeonCreatures(miteSeeds, visibleMites, "mite");
       runNeonCreatures(spiderSeeds, visibleSpiders, "spider");
+      runArgonHelpers(palmSeeds, visiblePalms, "palm");
+      runArgonHelpers(droneSeeds, visibleDrones, "drone");
 
       // Independent roam/jump phases: small walkers circle the whole ball and
       // leap in to hit the glass. Effects are cosmetic; all owned helpers earn.
@@ -656,7 +696,7 @@ export default function PlasmaBall({
       }
 
       // ---- hint on a brand-new dark ball ----
-      if (crk === 0 && !held && fing === 0 && mites === 0 && spiders === 0 && toe === 0 && ghs === 0 && stm === 0) {
+      if (crk === 0 && !held && fing === 0 && mites === 0 && spiders === 0 && toe === 0 && palms === 0 && drones === 0 && ghs === 0 && stm === 0) {
         ctx.globalAlpha = 0.5 + Math.sin(t * 3) * 0.4;
         drawPixelText(ctx, CX, CY + 20, "PRESS THE BALL", "#ffffff");
         ctx.globalAlpha = 1;
