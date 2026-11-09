@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { accrueIdle, accrueOffline, bulkCost, cappedOfflineSeconds, fingerCost, purchaseUpgrade } from "../src/game/economy.ts";
 import { OFFLINE_CAP_S, HELPER_POWER, PRESS_INTERVAL, MAX_VOLT_LEVELS, VOLT_LEVEL_BONUS, voltMult } from "../src/game/config.ts";
-import { BACKUP_KEY, PRE_VOLTAGE_BACKUP_KEY, PRE_HELPER_BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
+import { BACKUP_KEY, PRE_VOLTAGE_BACKUP_KEY, PRE_HELPER_BACKUP_KEY, PRE_ARGON_BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
 import { measureTick } from "../src/game/timing.ts";
 import { visibleHelperCount, visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../src/render/limits.ts";
 import { advanceStickman, createStickman } from "../src/render/stickmen.ts";
@@ -326,11 +326,11 @@ test("all finger, toe, and stickman orbit rings fit inside the canvas without to
 });
 
 test("Prestige capacity starts independent for every helper", () => {
-  assert.deepEqual(BASE_CAPACITY, { finger: 30, sparkMite: 35, copperSpider: 20, toe: 25, ghost: 20, stickman: 15 });
-  assert.deepEqual(CAPACITY_STEP, { finger: 10, sparkMite: 10, copperSpider: 5, toe: 5, ghost: 5, stickman: 3 });
+  assert.deepEqual(BASE_CAPACITY, { finger: 30, sparkMite: 35, copperSpider: 20, toe: 25, conductivePalm: 25, orbitDrone: 18, ghost: 20, stickman: 15 });
+  assert.deepEqual(CAPACITY_STEP, { finger: 10, sparkMite: 10, copperSpider: 5, toe: 5, conductivePalm: 5, orbitDrone: 4, ghost: 5, stickman: 3 });
   const s = freshSave();
-  assert.deepEqual(s.prestige.capacityLevels, { finger: 0, sparkMite: 0, copperSpider: 0, toe: 0, ghost: 0, stickman: 0 });
-  for (const kind of ["finger", "sparkMite", "copperSpider", "toe", "ghost", "stickman"])
+  assert.deepEqual(s.prestige.capacityLevels, { finger: 0, sparkMite: 0, copperSpider: 0, toe: 0, conductivePalm: 0, orbitDrone: 0, ghost: 0, stickman: 0 });
+  for (const kind of ["finger", "sparkMite", "copperSpider", "toe", "conductivePalm", "orbitDrone", "ghost", "stickman"])
     assert.equal(helperCapacity(s, kind), BASE_CAPACITY[kind]);
   const wealthy = { ...s, plasma: { neon: 1e30, argon: 1e30, xenon: 1e30, krypton: 1e30 },
     unlocked: ["neon", "argon", "xenon", "krypton"] };
@@ -567,7 +567,7 @@ test("v17 lifetime history survives real save and reload without resetting save 
   s = purchaseUpgrade(s, "finger", undefined, 2).state;
   assert.equal(persist(s), true);
   const stored = JSON.parse(items.get(SAVE_KEY));
-  assert.equal(stored.v, 18);
+  assert.equal(stored.v, 19);
   assert.equal(loadSave().lifetime.helperHires.finger, 2);
   assert.equal(loadSave().fingers, 2);
   assert.equal(loadSave().lifetime.peakHelpRate.neon, s.lifetime.peakHelpRate.neon);
@@ -657,7 +657,7 @@ test("first legacy Voltage load stores an untouched snapshot through later autos
   assert.equal(persist({ ...migrated, fingers: 3 }), true);
   assert.equal(loadSave().legacyVoltage.neon, 1234);
   assert.equal(items.get(PRE_VOLTAGE_BACKUP_KEY), raw);
-  assert.equal(JSON.parse(items.get(SAVE_KEY)).v, 18);
+  assert.equal(JSON.parse(items.get(SAVE_KEY)).v, 19);
   resetSave();
   assert.equal(items.has(PRE_VOLTAGE_BACKUP_KEY), false);
 }));
@@ -678,7 +678,7 @@ test("helper catalog preserves v0.12.26 prices at early and mixed-currency thres
     helperUnlocked, isHelperId } = await import("../src/game/helpers.ts");
   const { fingerCost, toeCost, ghostCost, stickmanCost, buyMsg } = await import("../src/game/economy.ts");
   const { GAS_LIST } = await import("../src/game/gases.ts");
-  assert.deepEqual(HELPER_IDS, ["finger", "sparkMite", "copperSpider", "toe", "ghost", "stickman"]);
+  assert.deepEqual(HELPER_IDS, ["finger", "sparkMite", "copperSpider", "toe", "conductivePalm", "orbitDrone", "ghost", "stickman"]);
   assert.deepEqual(HELPER_CATALOG.filter(h => ["finger", "toe", "ghost", "stickman"].includes(h.id)).map(h => h.nativeGas), GAS_LIST.map(g => g.id));
   const gasSets = [
     ["neon"],
@@ -704,9 +704,9 @@ test("helper catalog preserves v0.12.26 prices at early and mixed-currency thres
       assert.deepEqual(stickmanCost(n), { krypton: Math.ceil(120 * 1.5 ** n) });
     }
   }
-  assert.deepEqual(HELPER_CATALOG.map(h => h.power), [1, 3, 12, 8, 20, 45]);
-  assert.deepEqual(HELPER_CATALOG.map(h => h.baseCapacity), [30, 35, 20, 25, 20, 15]);
-  assert.deepEqual(HELPER_CATALOG.map(h => h.capacityStep), [10, 10, 5, 5, 5, 3]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.power), [1, 3, 12, 8, 18, 50, 20, 45]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.baseCapacity), [30, 35, 20, 25, 25, 18, 20, 15]);
+  assert.deepEqual(HELPER_CATALOG.map(h => h.capacityStep), [10, 10, 5, 5, 5, 4, 5, 3]);
   assert.deepEqual([1, 2].map(n => buyMsg("finger", undefined, n)),
     ["+1 FINGER HIRED", "+2 FINGERS HIRED"]);
   assert.deepEqual([1, 2].map(n => buyMsg("toe", undefined, n)),
