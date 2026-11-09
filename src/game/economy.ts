@@ -18,7 +18,8 @@ import {
 } from "./config.ts";
 import type { Gas, GasId, GasRecord, GameState } from "./types.ts";
 import { helperRoom } from "./prestige.ts";
-import { HELPER_CATALOG, helperCost, helperDefinition, helperOwned, isHelperId } from "./helpers.ts";
+import { HELPER_CATALOG, helperCost, helperDefinition, helperOwned, helperUnlocked, isHelperId } from "./helpers.ts";
+import { canDiscoverNextGas } from "./mastery.ts";
 
 // Compatibility exports for callers and tests. Prices are defined in helpers.ts.
 export const fingerCost = (n: number, unlocked: GasId[]): Partial<GasRecord> =>
@@ -67,7 +68,7 @@ export const pay = (s: GameState, cost: Partial<GasRecord>) => {
 // ---------- Bulk buying (1 / 5 / 10 / 100 / MAX) ----------
 // Upper safety limit for one MAX purchase; helper and upgrade caps still apply.
 export const MAX_BULK_PURCHASE = 1000;
-export type BuyKind = "finger" | "toe" | "ghost" | "stickman" | "filament" | "voltage" | "split" | "gas";
+export type BuyKind = import("./types.ts").HelperId | "filament" | "voltage" | "split" | "gas";
 
 export const addCosts = (a: Partial<GasRecord>, b: Partial<GasRecord>): Partial<GasRecord> => {
   const out: Partial<GasRecord> = { ...a };
@@ -85,7 +86,7 @@ export const bulkCost = (
   let n = 0;
   while (n < count) {
     let c: Partial<GasRecord> | null = null;
-    if (isHelperId(kind) && n < helperRoom(s, kind))
+    if (isHelperId(kind) && helperUnlocked(s, kind) && n < helperRoom(s, kind))
       c = helperCost(kind, helperOwned(s, kind) + n, s.unlocked);
     if (kind === "filament" && gid)
       c = s.filaments[gid] + n >= gasById(gid).cap ? null : filamentCost(gid, s.filaments[gid] + n);
@@ -94,7 +95,7 @@ export const bulkCost = (
     if (kind === "split" && gid)
       c = s.splits[gid] + n >= SPLIT_CAP ? null : splitCost(gid, s.splits[gid] + n);
     if (kind === "gas")
-      c = n === 0 ? nextGas(s.unlocked)?.unlockCost ?? null : null;
+      c = n === 0 && canDiscoverNextGas(s) ? nextGas(s.unlocked)?.unlockCost ?? null : null;
     if (!c) break;
     const nextTotal = addCosts(total, c);
     if (!canAfford(s, nextTotal)) break;
@@ -106,7 +107,7 @@ export const bulkCost = (
 
 // price of the next single unit — shown when you can't afford any
 export function peekCost(s: GameState, kind: BuyKind, gid?: GasId): Partial<GasRecord> {
-  if (isHelperId(kind)) return helperRoom(s, kind)
+  if (isHelperId(kind)) return helperUnlocked(s, kind) && helperRoom(s, kind)
     ? helperCost(kind, helperOwned(s, kind), s.unlocked) : {};
   if (kind === "filament" && gid)
     return s.filaments[gid] >= gasById(gid).cap ? {} : filamentCost(gid, s.filaments[gid]);
