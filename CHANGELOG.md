@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.29 - Argon chapter and gradual helper discovery
+
+- Add Conductive Palms (power 18, first cost 220 Argon) with animated electrically charged fingertips and distinct contact frames
+- Add Orbit Drones (power 50, first cost 2,200 Argon) that patrol outside the globe and fire bounded electric discharges
+- Keep the HELP tab focused: a Big Toe reveals the Palm, and buying a Palm reveals the Drone; old saves that reached Xenon keep access to the full Argon roster
+- Add Argon Mastery to the GAS tab: 60,000 Argon produced in the current run, one Orbit Drone bought and 12,000 Argon to discover Xenon
+- Reuse the Neon Mastery UI and cumulative-produced (not spendable-balance) mechanic, with undiscovered helpers kept secret until revealed
+- Preserve prior unlocks, helper prices, Neon progression, all older helper art, Voltage behavior and Prestige purchases, and keep every owned helper visible
+- Migrate saves to internal schema v19 with retained lifetime hires and Prestige capacities; save an untouched pre-expansion snapshot on first load
+- Add regression tests for the milestone, multi-currency purchase protection, unlocking, old-save recovery, original sprite frames and mobile-friendly UI
+
 ## 0.12.28 - Neon creatures, gradual discoveries and Neon Mastery
 
 - Add **Spark Mites** and **Copper Spiders**, two purchasable Neon helpers with their own original three-pose code-drawn pixel art, animated roaming and separate contact effects
