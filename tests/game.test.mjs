@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { accrueIdle, accrueOffline, bulkCost, cappedOfflineSeconds, fingerCost, purchaseUpgrade } from "../src/game/economy.ts";
 import { OFFLINE_CAP_S, HELPER_POWER, PRESS_INTERVAL, MAX_VOLT_LEVELS, VOLT_LEVEL_BONUS, voltMult } from "../src/game/config.ts";
-import { BACKUP_KEY, PRE_VOLTAGE_BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
+import { BACKUP_KEY, PRE_VOLTAGE_BACKUP_KEY, PRE_HELPER_BACKUP_KEY, LEGACY_V9_KEY, SAVE_KEY, freshSave, loadSave, migrateSave, persist, resetSave } from "../src/game/save.ts";
 import { measureTick } from "../src/game/timing.ts";
 import { visibleHelperCount, visibleHelperCounts, helperOrbitRadius, helperEffectChance } from "../src/render/limits.ts";
 import { advanceStickman, createStickman } from "../src/render/stickmen.ts";
@@ -892,4 +892,23 @@ test("Neon helper sprite atlas provides three separate real pixel poses per crea
     }
     assert.equal(seen.size, 3, "every animation pose must be distinct");
   }
+});
+
+test("old helper save has a protected original snapshot through repeated autosaves", () => withStorage((items) => {
+  const old = freshSave();
+  const raw = JSON.stringify({ ...old, fingers: 7, v: 17 });
+  items.set(SAVE_KEY, raw);
+  const migrated = loadSave();
+  assert.equal(migrated.fingers, 7);
+  assert.equal(migrated.sparkMites, 0);
+  assert.equal(migrated.copperSpiders, 0);
+  assert.equal(items.get(PRE_HELPER_BACKUP_KEY), raw);
+  assert.equal(persist(migrated), true);
+  assert.equal(persist({ ...migrated, fingers: 9 }), true);
+  assert.equal(items.get(PRE_HELPER_BACKUP_KEY), raw);
+  const current = JSON.parse(items.get(SAVE_KEY));
+  assert.equal(current.v, 18);
+  assert.equal(loadSave().fingers, 9);
+  resetSave();
+  assert.equal(items.has(PRE_HELPER_BACKUP_KEY), false);
 });
