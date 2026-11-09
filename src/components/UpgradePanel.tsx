@@ -154,7 +154,8 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                       </div>
                       <div className="mt-0.5 text-[9px] leading-[13px]"
                         style={{ color: state.copperSpiders > 0 ? "#9df4bd" : "#d8b8e8" }}>
-                        {state.copperSpiders > 0 ? "COPPER SPIDER DISCOVERED" : "BUY A COPPER SPIDER TO COMPLETE MASTERY"}
+                        {state.copperSpiders > 0 ? "COPPER SPIDER DISCOVERED" : helperVisible(state, "copperSpider")
+                          ? "BUY A COPPER SPIDER TO COMPLETE MASTERY" : "DISCOVER MORE NEON HELPERS TO ADVANCE"}
                       </div>
                       {neonChapterComplete(state) && <div className="mt-1 text-[9px] font-bold text-[#9df4bd]">ARGON DISCOVERY AVAILABLE</div>}
                     </section>
@@ -165,7 +166,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                         <UpgradeRow
                           name={`${nxGas.name} GAS`}
                           sub={nxGas.id === "argon" && !neonChapterComplete(state)
-                            ? "REQUIRES NEON MASTERY & COPPER SPIDER"
+                            ? (helperVisible(state, "copperSpider") ? "REQUIRES NEON MASTERY & COPPER SPIDER" : "REQUIRES NEON MASTERY")
                             : `NEW CURRENCY · ${fmt(nxGas.baseRate)}/TAP BASE`}
                           cost={nxGas.unlockCost}
                           icon={<PixelIcon sprite={GAS_ICON} color={nxGas.color} px={3} />}
