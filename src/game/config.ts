@@ -8,7 +8,7 @@ import type { GasRecord } from "./types.ts";
 export const PRESS_INTERVAL = 2.2; // hired help presses this often
 export const HOLD_INTERVAL = 1.2; // manual crackles while held (per finger)
 /** Fixed base power per helper type. These values do not depend on finger ownership. */
-export const HELPER_POWER = { finger: 1, toe: 8, ghost: 20, stickman: 45 } as const;
+export const HELPER_POWER = { finger: 1, sparkMite: 3, copperSpider: 12, toe: 8, ghost: 20, stickman: 45 } as const;
 export const OFFLINE_CAP_S = 8 * 3600;
 
 export const FIL_BASE: GasRecord = { neon: 12, argon: 30, xenon: 80, krypton: 180 };
