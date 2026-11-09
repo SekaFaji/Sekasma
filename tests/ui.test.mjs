@@ -769,7 +769,8 @@ test("Neon Mastery UI describes cumulative run earnings and the Spider requireme
   assert.match(html, /NEON MASTERY/);
   assert.match(html, /aria-label="Neon Mastery progress"/);
   assert.match(html, /aria-valuenow="50"/);
-  assert.match(html, /BUY A COPPER SPIDER TO COMPLETE MASTERY/);
+  assert.match(html, /DISCOVER MORE NEON HELPERS TO ADVANCE/);
+  assert.doesNotMatch(html, /BUY A COPPER SPIDER TO COMPLETE MASTERY/);
   assert.match(html, /REQUIRES NEON MASTERY/);
   assert.match(html, /disabled=""/);
   const ready = { ...state, copperSpiders: 1, total: { ...state.total, neon: 6000 } };
