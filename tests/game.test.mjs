@@ -756,3 +756,140 @@ test("catalog purchase and Prestige retain exact save fields, balances and lifet
   assert.deepEqual(reloaded.lifetime.helperHires, current.lifetime.helperHires);
   assert.equal(reloaded.voltage.neon, 0);
 });
+
+test("Neon helpers unlock in sequence, cannot be purchased early, and retain old helper rates", async () => {
+  const { helperCost, helperVisible, helperUnlocked } = await import("../src/game/helpers.ts");
+  const s = freshSave();
+  s.plasma.neon = 1e7;
+  assert.equal(helperVisible(s, "sparkMite"), false);
+  assert.equal(helperVisible(s, "copperSpider"), false);
+  assert.equal(bulkCost(s, "sparkMite", undefined, 1).count, 0);
+  assert.equal(bulkCost(s, "copperSpider", undefined, 1).count, 0);
+  assert.deepEqual(helperCost("sparkMite", 0, ["neon"]), { neon: 40 });
+  assert.deepEqual(helperCost("sparkMite", 1, ["neon"]), { neon: 52 });
+  assert.deepEqual(helperCost("copperSpider", 0, ["neon"]), { neon: 350 });
+  assert.deepEqual(helperCost("copperSpider", 1, ["neon"]), { neon: 483 });
+  let a = purchaseUpgrade(s, "finger", undefined, 1).state;
+  assert.equal(helperUnlocked(a, "sparkMite"), true);
+  assert.equal(helperVisible(a, "copperSpider"), false);
+  a = purchaseUpgrade(a, "sparkMite", undefined, 2).state;
+  assert.equal(a.sparkMites, 2);
+  assert.equal(a.lifetime.helperHires.sparkMite, 2);
+  assert.equal(helperUnlocked(a, "copperSpider"), true);
+  a = purchaseUpgrade(a, "copperSpider", undefined, 1).state;
+  assert.equal(a.copperSpiders, 1);
+  assert.equal(a.lifetime.helperHires.copperSpider, 1);
+  assert.ok(Math.abs(idleRate(a).neon -
+    (1 + 2 * 3 + 12) * 0.1 / PRESS_INTERVAL) < 1e-10);
+  assert.equal(s.fingers, 0);
+  assert.equal(s.sparkMites, 0);
+  assert.equal(s.copperSpiders, 0);
+});
+
+test("Neon Mastery depends on lifetime-earned Neon this run and one purchased Spider", async () => {
+  const { NEON_MASTERY_REQUIRED, ARGON_MASTER_PRICE, neonProducedThisRun, neonChapterComplete,
+    neonMasteryProgress } = await import("../src/game/mastery.ts");
+  assert.equal(NEON_MASTERY_REQUIRED, 6000);
+  assert.equal(ARGON_MASTER_PRICE, 1800);
+  const s = freshSave();
+  s.plasma.neon = 1e7;
+  assert.equal(bulkCost(s, "gas", undefined, 1).count, 0, "currency alone does not bypass Mastery");
+  assert.equal(neonMasteryProgress(s), 0);
+  s.total.neon = 6000;
+  assert.equal(neonMasteryProgress(s), 100);
+  assert.equal(neonChapterComplete(s), false, "Spider required");
+  let current = purchaseUpgrade(s, "finger", undefined, 1).state;
+  current = purchaseUpgrade(current, "sparkMite", undefined, 1).state;
+  current = purchaseUpgrade(current, "copperSpider", undefined, 1).state;
+  assert.equal(neonChapterComplete(current), true);
+  assert.equal(bulkCost(current, "gas", undefined, 1).count, 1);
+  assert.equal(bulkCost(current, "gas", undefined, 1).cost.neon, 1800);
+  assert.equal(neonProducedThisRun(current), 6000);
+  const gas = purchaseUpgrade(current, "gas", undefined, 1);
+  assert.equal(gas.state.unlocked.includes("argon"), true);
+  assert.equal(gas.state.plasma.neon, current.plasma.neon - 1800);
+  assert.equal(s.unlocked.length, 1);
+  const spent = { ...current, plasma: { ...current.plasma, neon: 1800 } };
+  assert.equal(neonMasteryProgress(spent), 100, "spending must not reduce Mastery");
+  const nextRun = { ...current, prestige: { ...current.prestige,
+    lastTotal: { ...current.prestige.lastTotal, neon: 1500 } } };
+  assert.equal(neonProducedThisRun(nextRun), 4500);
+  assert.equal(bulkCost(nextRun, "gas", undefined, 1).count, 0);
+});
+
+test("v17 migration retains existing plasma, gases, power and legacy helper records", () => {
+  const old = freshSave();
+  old.plasma = { neon: 1234, argon: 567, xenon: 89, krypton: 1 };
+  old.unlocked = ["neon", "argon", "xenon"];
+  old.total.neon = 12000;
+  old.fingers = 8;
+  old.toes = 3;
+  old.voltage.neon = 4;
+  old.prestige.capacityLevels.finger = 2;
+  old.lifetime.helperHires.finger = 48;
+  const { sparkMites, copperSpiders, ...legacy } = old;
+  void sparkMites; void copperSpiders;
+  const saved = { ...legacy, v: 17, prestige: { ...legacy.prestige,
+    capacityLevels: { finger: 2, toe: 0, ghost: 0, stickman: 0 },
+    legacyCapacity: { finger: 30, toe: 25, ghost: 20, stickman: 15 } },
+    lifetime: { ...legacy.lifetime,
+      helperHires: { finger: 48, toe: 3, ghost: 0, stickman: 0 } },
+  };
+  const restored = migrateSave(saved);
+  assert.deepEqual(restored.plasma, old.plasma);
+  assert.deepEqual(restored.unlocked, old.unlocked);
+  assert.equal(restored.fingers, 8);
+  assert.equal(restored.toes, 3);
+  assert.equal(restored.sparkMites, 0);
+  assert.equal(restored.copperSpiders, 0);
+  assert.equal(restored.lifetime.helperHires.finger, 48);
+  assert.equal(restored.lifetime.helperHires.sparkMite, 0);
+  assert.equal(restored.prestige.capacityLevels.finger, 2);
+  assert.equal(restored.voltage.neon, 4);
+  assert.ok(Math.abs(idleRate(restored).neon -
+    (8 + 3 * 8) * 0.1 * (1 + restored.voltage.neon * 0.1) / PRESS_INTERVAL) < 1e-10);
+});
+
+test("v18 saves preserve both Neon helper counts, lifetime hires and Prestige reset", () => {
+  const s = freshSave();
+  s.unlocked = ["neon", "argon", "xenon", "krypton"];
+  s.total.krypton = 3000;
+  s.total.neon = 100000;
+  s.plasma.neon = 1e7;
+  s.fingers = 1;
+  s.sparkMites = 3;
+  s.copperSpiders = 2;
+  s.lifetime.helperHires.sparkMite = 7;
+  s.lifetime.helperHires.copperSpider = 4;
+  const restored = migrateSave({ ...s, v: 18 });
+  assert.equal(restored.sparkMites, 3);
+  assert.equal(restored.copperSpiders, 2);
+  assert.equal(restored.lifetime.helperHires.sparkMite, 7);
+  assert.equal(restored.lifetime.helperHires.copperSpider, 4);
+  const reset = performPrestige(restored);
+  assert.equal(reset.sparkMites, 0);
+  assert.equal(reset.copperSpiders, 0);
+  assert.equal(reset.lifetime.helperHires.sparkMite, 7);
+  assert.equal(reset.lifetime.helperHires.copperSpider, 4);
+  assert.equal(reset.unlocked.length, 1);
+  assert.ok(reset.prestige.cycles > 0);
+});
+
+test("Neon helper sprite atlas provides three separate real pixel poses per creature", async () => {
+  const art = await import("../src/render/neonCreatures.ts");
+  for (const [frames, palette, width, height] of [
+    [art.SPARK_MITE_FRAMES, art.MITE_PALETTE, 13, 13],
+    [art.COPPER_SPIDER_FRAMES, art.SPIDER_PALETTE, 17, 15],
+  ]) {
+    assert.equal(frames.length, 3);
+    const seen = new Set();
+    for (const pose of frames) {
+      assert.equal(pose.length, height);
+      assert.ok(pose.every(row => row.length === width));
+      assert.ok(pose.some(row => row.includes("5")), "bright eyes visible");
+      for (const ch of pose.join("")) assert.ok(ch === "." || palette[ch], `unknown art pixel ${ch}`);
+      seen.add(pose.join("|"));
+    }
+    assert.equal(seen.size, 3, "every animation pose must be distinct");
+  }
+});
