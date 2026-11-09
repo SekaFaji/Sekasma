@@ -51,7 +51,7 @@ export const SPARK_MITE_FRAMES = [
     ".............",
     ".............",
   ],
-] as const;
+];
 
 export const COPPER_SPIDER_FRAMES = [
   [
@@ -105,7 +105,7 @@ export const COPPER_SPIDER_FRAMES = [
     ".................",
     ".................",
   ],
-] as const;
+];
 
 export const MITE_PALETTE: Readonly<Record<string, string>> = {
   "0": "#2c1737", "1": "#aa3d83", "2": "#ee7dc1",
@@ -129,7 +129,7 @@ export function drawNeonCreature(
   const mite = kind === "mite";
   const frames = mite ? SPARK_MITE_FRAMES : COPPER_SPIDER_FRAMES;
   const phase = Math.sin(t * (mite ? 13 : 8) + index * 1.73);
-  const sprite = frames[contacting ? 2 : phase >= 0 ? 0 : 1] as unknown as string[];
+  const sprite = frames[contacting ? 2 : phase >= 0 ? 0 : 1] ;
   const px = Math.round(centerX - sprite[0].length / 2);
   const py = Math.round(centerY - sprite.length / 2);
   drawSprite(ctx, sprite, px, py, mite ? MITE_PALETTE : SPIDER_PALETTE);
