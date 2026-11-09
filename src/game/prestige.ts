@@ -11,7 +11,7 @@ export const MIN_PRESTIGE_SCORE = 100_000;
 export function freshPrestige(): PrestigeProgress {
   return {
     cycles: 0, sparks: 0, lifetimeSparks: 0,
-    capacityLevels: { finger: 0, toe: 0, ghost: 0, stickman: 0 },
+    capacityLevels: Object.fromEntries(HELPER_IDS.map(id => [id, 0])) as import("./types.ts").HelperRecord,
     legacyCapacity: { ...BASE_CAPACITY },
     lastTotal: zero3(),
   };
