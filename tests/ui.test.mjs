@@ -793,3 +793,23 @@ test("Neon sprites are available as full-color icons, without emoji or image ass
   assert.match(html, /COPPER SPIDER/);
   assert.match(html, /<canvas/);
 });
+
+test("Neon pixel-art atlas has three distinct detailed poses per helper", async () => {
+  const art = await server.ssrLoadModule("/src/render/neonCreatures.ts");
+  for (const [frames, palette, width, height] of [
+    [art.SPARK_MITE_FRAMES, art.MITE_PALETTE, 13, 13],
+    [art.COPPER_SPIDER_FRAMES, art.SPIDER_PALETTE, 17, 15],
+  ]) {
+    assert.equal(frames.length, 3);
+    const variants = new Set();
+    for (const sprite of frames) {
+      assert.equal(sprite.length, height);
+      assert.ok(sprite.every(row => row.length === width));
+      assert.ok(sprite.join("").includes("5"), "bright eyes visible");
+      for (const pixel of sprite.join(""))
+        assert.ok(pixel === "." || palette[pixel], `unknown sprite pixel ${pixel}`);
+      variants.add(sprite.join("|"));
+    }
+    assert.equal(variants.size, 3, "walk A, walk B and discharge must differ");
+  }
+});
