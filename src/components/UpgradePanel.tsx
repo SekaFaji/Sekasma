@@ -10,7 +10,9 @@ import { previewPurchaseImpact } from "../game/purchasePreview";
 import type { BuyKind } from "../game/economy";
 import { fmt } from "../utils/format";
 import { helperCapacity } from "../game/prestige";
-import { HELPER_CATALOG, helperOwned, helperUnlocked } from "../game/helpers";
+import { HELPER_CATALOG, helperOwned, helperUnlocked, helperVisible } from "../game/helpers";
+import { canDiscoverNextGas, neonChapterComplete, neonMasteryProgress, neonProducedThisRun, NEON_MASTERY_REQUIRED } from "../game/mastery";
+import { SPARK_MITE_FRAMES, COPPER_SPIDER_FRAMES, MITE_PALETTE, SPIDER_PALETTE } from "../render/neonCreatures";
 import { FINGER_SPRITE, FOOT_SPRITE, GHOST_SPRITE, STICKMAN_SPRITE, GAS_ICON, FIL_ICON, VOLT_ICON, SPLIT_ICON } from "../render/sprites";
 import { SKIN_PALETTE, TOE_PALETTE, GHOST_PALETTE, STICKMAN_PALETTE } from "../render/palette";
 import type { Gas, GasId, GameState, HelperId } from "../game/types";
@@ -40,6 +42,8 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
   });
   const helperImages: Record<HelperId, { sprite: string[]; palette: Record<string, string> }> = {
     finger: { sprite: FINGER_SPRITE, palette: SKIN_PALETTE },
+    sparkMite: { sprite: SPARK_MITE_FRAMES[0], palette: MITE_PALETTE },
+    copperSpider: { sprite: COPPER_SPIDER_FRAMES[0], palette: SPIDER_PALETTE },
     toe: { sprite: FOOT_SPRITE, palette: TOE_PALETTE },
     ghost: { sprite: GHOST_SPRITE, palette: GHOST_PALETTE },
     stickman: { sprite: STICKMAN_SPRITE, palette: STICKMAN_PALETTE },
@@ -51,7 +55,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
   const subDots: Record<UpTab, boolean> = {
     help: HELPER_CATALOG.some(helper =>
       helperUnlocked(state, helper.id) && quote(helper.id).count > 0),
-    gas: !!nxGas && canAfford(state, nxGas.unlockCost),
+    gas: !!nxGas && canDiscoverNextGas(state) && canAfford(state, nxGas.unlockCost),
     power: unlockedGases.some((g) => powerKinds.some((k) => bulkCost(state, k, g.id, 1).count > 0)),
   };
 
@@ -94,7 +98,7 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
               <div id={`upgrade-panel-${upTab}`} role="tabpanel" aria-labelledby={`upgrade-tab-${upTab}`} className="flex flex-col gap-1">
               {upTab === "help" && (
                 <>
-                  {HELPER_CATALOG.map(helper => {
+                  {HELPER_CATALOG.filter(helper => helperVisible(state, helper.id)).map(helper => {
                     const unlocked = helperUnlocked(state, helper.id);
                     const offer = unlocked ? quote(helper.id) : null;
                     const image = helperImages[helper.id];
@@ -134,17 +138,40 @@ export default function UpgradePanel({ state, unlockedGases, accent, upTab, onUp
                       color={g.color}
                     />
                   ))}
+                  {nxGas?.id === "argon" && (
+                    <section aria-label="Neon Mastery" className="mb-1 border border-[#ff78c4]/40 bg-[#21112f] px-2 py-2">
+                      <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-[#ff9ed6]">
+                        <span>NEON MASTERY</span>
+                        <span className="tabular-nums">{Math.floor(neonMasteryProgress(state))}%</span>
+                      </div>
+                      <div role="progressbar" aria-label="Neon Mastery progress"
+                        aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.floor(neonMasteryProgress(state))}
+                        className="h-[9px] overflow-hidden border border-[#ff9aca]/50 bg-[#0c0619]">
+                        <div className="h-full bg-[#fa64b5]" style={{ width: `${neonMasteryProgress(state)}%` }} />
+                      </div>
+                      <div className="mt-1 text-[9px] leading-[13px] text-white/80">
+                        {fmt(neonProducedThisRun(state))} / {fmt(NEON_MASTERY_REQUIRED)} NEON EARNED THIS RUN
+                      </div>
+                      <div className="mt-0.5 text-[9px] leading-[13px]"
+                        style={{ color: state.copperSpiders > 0 ? "#9df4bd" : "#d8b8e8" }}>
+                        {state.copperSpiders > 0 ? "COPPER SPIDER DISCOVERED" : "BUY A COPPER SPIDER TO COMPLETE MASTERY"}
+                      </div>
+                      {neonChapterComplete(state) && <div className="mt-1 text-[9px] font-bold text-[#9df4bd]">ARGON DISCOVERY AVAILABLE</div>}
+                    </section>
+                  )}
                   {nxGas
                     ? (
                       <React.Fragment>
                         <UpgradeRow
                           name={`${nxGas.name} GAS`}
-                          sub={`NEW CURRENCY · ${fmt(nxGas.baseRate)}/TAP BASE`}
+                          sub={nxGas.id === "argon" && !neonChapterComplete(state)
+                            ? "REQUIRES NEON MASTERY & COPPER SPIDER"
+                            : `NEW CURRENCY · ${fmt(nxGas.baseRate)}/TAP BASE`}
                           cost={nxGas.unlockCost}
                           icon={<PixelIcon sprite={GAS_ICON} color={nxGas.color} px={3} />}
                           onBuy={() => buy("gas")}
                           purchased={purchaseFeedback?.key === "gas" ? purchaseFeedback.message : undefined}
-                          disabled={!canAfford(state, nxGas.unlockCost)}
+                          disabled={!canDiscoverNextGas(state) || !canAfford(state, nxGas.unlockCost)}
                           plasma={state.plasma}
                           color={nxGas.color}
                         />
