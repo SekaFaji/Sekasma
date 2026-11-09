@@ -892,7 +892,7 @@ test("old helper save has a protected original snapshot through repeated autosav
   assert.equal(persist({ ...migrated, fingers: 9 }), true);
   assert.equal(items.get(PRE_HELPER_BACKUP_KEY), raw);
   const current = JSON.parse(items.get(SAVE_KEY));
-  assert.equal(current.v, 18);
+  assert.equal(current.v, 19);
   assert.equal(loadSave().fingers, 9);
   resetSave();
   assert.equal(items.has(PRE_HELPER_BACKUP_KEY), false);
