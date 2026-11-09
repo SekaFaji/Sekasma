@@ -4,7 +4,8 @@
  * Expensive arc/ripple effects are sampled separately for mobile performance.
  */
 export type HelperKind = "fingers" | "mites" | "spiders" | "toes" | "ghosts" | "stickmen";
-export type HelperCounts = Record<HelperKind, number>;
+/** Legacy four-way count API remains compatible; new creatures are drawn separately. */
+export type HelperCounts = Record<Exclude<HelperKind, "mites" | "spiders">, number>;
 
 export function visibleHelperCount(count: number, _kind: HelperKind): number {
   return Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
