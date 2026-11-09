@@ -273,6 +273,8 @@ export default function App() {
             sparkMites={state.sparkMites}
             copperSpiders={state.copperSpiders}
             toes={state.toes}
+            conductivePalms={state.conductivePalms}
+            orbitDrones={state.orbitDrones}
             crackles={state.crackles}
             neonPow={neonPow}
             buzzOn={buzz}
