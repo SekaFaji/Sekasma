@@ -123,6 +123,7 @@ export function helperVisible(state: GameState, id: HelperId): boolean {
   if (!helper.revealAfter) return true;
   return helperOwned(state, id) > 0 ||
     helperOwned(state, helper.revealAfter) > 0 ||
+    (state.lifetime?.helperHires?.[helper.revealAfter] ?? 0) > 0 ||
     (helper.nativeGas !== "neon" && state.unlocked.includes(helper.nativeGas)) ||
     (helper.nativeGas === "neon" && state.unlocked.includes("argon"));
 }
